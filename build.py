@@ -7,7 +7,8 @@
     python build.py --out site       # another output folder (it is cleared first, but only if this tool made it)
     python build.py --site ../my-blog   # build another folder's site with this engine (see "One engine, several sites" in the README)
 
-Sources: site.json, content/posts/*.html, content/pages/*.html (pages are not listed on the home page), content/images/*,
+Sources: site.json, content/posts/*.html, content/pages/*.html (pages are not listed on the home page), content/drafts/*.html
+(posts that are always drafts: a place for work in progress that you keep out of git), content/images/*,
 theme/. Each content file starts with a front-matter block and continues with the HTML of the page body:
 
     ---
@@ -143,9 +144,11 @@ def load_site(root=ROOT):
 
 def load_entries(root=ROOT):
     entries, seen = [], {}
-    for kind, folder in (("post", "posts"), ("page", "pages")):
+    for kind, folder in (("post", "posts"), ("page", "pages"), ("post", "drafts")):
         for path in sorted((root / "content" / folder).glob("*.html")):
             e = load_entry(path, kind)
+            if folder == "drafts":
+                e["draft"] = True                       # content/drafts/ is for work in progress: built locally, never published
             if e["slug"] in seen:
                 raise BuildError(f"{path}: the address '{e['slug']}' is already used by {seen[e['slug']]}")
             seen[e["slug"]] = path

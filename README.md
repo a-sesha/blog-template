@@ -83,6 +83,12 @@ A site can leave out `theme/` entirely. A file under the site's `theme/` replace
 built-in one; the order is the site's `content/snippets/`, the site's `theme/components/`, then the engine's. Building a site never
 writes into the engine's folder. This folder is itself a complete example site (the default when you pass no `--site`).
 
+## Work in progress: `content/drafts/`
+
+A post placed in `content/drafts/` (with an optional folder of its own files, like any post) is always a draft: it is built for you
+with a "draft" badge and is never published, whatever its front matter says. Put the folder in your `.gitignore` to keep unfinished
+work, and large media, out of a public repository; move the file to `content/posts/` when it is ready.
+
 ## A post with its own files
 
 For a post with media, data or custom scripts, put a folder next to its file: `content/posts/my-post.html` and
