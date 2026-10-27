@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<svg viewBox="0 0 680 150" role="img" aria-labelledby="pipeline-t pipeline-d"><title id="pipeline-t">Write, build, publish</title><desc id="pipeline-d">Three boxes joined by arrows: write an HTML file, run the build script, upload the public folder.</desc>
+<defs><marker id="pipeline-ar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#000" stroke-width="1.3"/></marker></defs>
+<rect x="33" y="33" width="170" height="80" fill="rgba(44,40,26,.09)"/><rect x="30" y="30" width="170" height="80" fill="#fff" stroke="#B4B3AF"/><rect x="30" y="30" width="20" height="18" fill="#EEEDE8" stroke="#B4B3AF"/><text class="small" x="40" y="43" text-anchor="middle">1</text>
+<text class="bold" x="115" y="76" text-anchor="middle">Write a post</text><text class="sub" x="115" y="92" text-anchor="middle">content/posts/*.html</text>
+<line x1="204" y1="70" x2="246" y2="70" stroke="#000" stroke-width="1.2" marker-end="url(#pipeline-ar)"/>
+<rect x="253" y="33" width="170" height="80" fill="rgba(44,40,26,.09)"/><rect x="250" y="30" width="170" height="80" fill="#fff" stroke="#B4B3AF"/><rect x="250" y="30" width="20" height="18" fill="#EEEDE8" stroke="#B4B3AF"/><text class="small" x="260" y="43" text-anchor="middle">2</text>
+<text class="bold" x="335" y="76" text-anchor="middle">Build</text><text class="sub" x="335" y="92" text-anchor="middle">python build.py --publish</text>
+<line x1="424" y1="70" x2="466" y2="70" stroke="#000" stroke-width="1.2" marker-end="url(#pipeline-ar)"/>
+<rect x="473" y="33" width="170" height="80" fill="#000"/><rect x="470" y="30" width="170" height="80" fill="#fff" stroke="#000"/><rect x="470" y="30" width="20" height="18" fill="#EEEDE8" stroke="#B4B3AF"/><text class="small" x="480" y="43" text-anchor="middle">3</text>
+<text class="bold" x="555" y="76" text-anchor="middle">Upload</text><text class="sub" x="555" y="92" text-anchor="middle">the public/ folder</text>
+</svg>

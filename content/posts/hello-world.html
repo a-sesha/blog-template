@@ -1,0 +1,29 @@
+---
+title: A first post, and how to replace it
+date: 2026-01-15
+description: What this template gives you, and the three things to change before you publish.
+tags: meta, template
+links: Components | ../components/index.html
+toc: true
+---
+<p class="lede">This is the smallest useful post: a title, a short header block, a few paragraphs, one figure and a footnote. Open
+<code>content/posts/hello-world.html</code> next to this page to see how little markup it takes.</p>
+
+{{#draft title="Draft note (only you see this)"}}Anything marked as a draft note is shown while you write and removed from the page source by <code>python build.py --publish</code>. Use it for reminders, outlines and half-sentences.{{/draft}}
+
+<h2>What you get</h2>
+<p>A single column of text at a comfortable 768&nbsp;px, serif headings, a sans-serif body and a monospace for everything that is
+data: dates, captions, buttons, diagram labels. Figures can break out to 1000&nbsp;px, or all the way to the edges of the window.</p>
+
+{{#figure caption="Figure 1. The whole workflow. There is no server, database or JavaScript framework to maintain."}}{{svg pipeline.svg}}{{/figure}}
+
+<h2>Three things to change</h2>
+<ol>
+<li>Open <code>site.json</code> and put in your name, a one-line description and, when you know it, the address of your site (this switches on the
+feed, the sitemap and canonical links).</li>
+<li>Replace the two example posts, or keep them as a reference and mark them <code>draft: true</code> so that <code>--publish</code> leaves them out.</li>
+<li>Pick your own colours by editing the variables at the top of <code>theme/style.css</code>; everything else follows them.</li>
+</ol>
+<p>Dates and the order of posts come from the front matter<sup class="fn"><a href="#fn1" id="r1">1</a></sup>, so you never edit a list by hand.</p>
+
+<ol class="footnotes"><li id="fn1">The block between the two <code>---</code> lines at the top of the file. <a href="#r1">Back to the text.</a></li></ol>

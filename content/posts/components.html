@@ -1,0 +1,134 @@
+---
+title: Every component in one place
+date: 2026-01-16
+description: A reference post: type, buttons, figures, cards, callouts, tables, code, hover definitions and footnotes, each with its markup.
+tags: reference, template
+links: Source | https://example.com/your-repo
+toc: true
+---
+<p class="lede">Copy what you need from here. Everything below is plain HTML with a class name; there is nothing to install and nothing to
+learn beyond the class names. Delete this post (or mark it <code>draft: true</code>) when you no longer need it.</p>
+
+<h2>Widths</h2>
+<p>Text sits in a 768&nbsp;px column. A direct child of the page body can choose a wider slot by class: <code>wide</code> (about 1000&nbsp;px) for
+figures and video, <code>full</code> for something that should touch both edges of the window. Because the page is a grid, these never cause sideways
+scrolling, and on a phone every width collapses to the screen.</p>
+<pre><code>&lt;div class="wide"&gt;...a figure...&lt;/div&gt;
+&lt;div class="full"&gt;...a banner...&lt;/div&gt;</code></pre>
+
+<h2>Type</h2>
+<p>Body text is a humanist sans at 17&nbsp;px, headings are a light serif, and anything that is data (dates, captions, buttons, diagram labels) is
+monospace. Links are <a href="#type">grey and underlined</a> until you point at them. Inline <code>code</code>, a <kbd>Ctrl</kbd>+<kbd>K</kbd> key
+and <mark>a highlight</mark> are available.</p>
+<h3>A third-level heading</h3>
+<p>Second- and third-level headings get an address you can link to; hover one to see the <code>#</code>.</p>
+<blockquote><p>A pull quote is set in the heading face. Use it sparingly, for the one sentence you want a reader to remember.</p><cite>Someone, somewhere</cite></blockquote>
+
+<h2>Buttons and tags</h2>
+<p>
+<a class="btn" href="#buttons-and-tags">A link button</a>
+<span class="seg"><button class="btn" type="button" aria-pressed="true">first</button><button class="btn" type="button" aria-pressed="false">second</button><button class="btn" type="button" aria-pressed="false">third</button></span>
+</p>
+<p><span class="pill">plain</span><span class="pill teal">teal</span><span class="pill butter">butter</span><span class="pill sage">sage</span></p>
+<p>Buttons are bevelled and square. The joined row (<code>seg</code>) marks the chosen one with <code>aria-pressed="true"</code>; wiring it to anything is
+up to your own script.</p>
+
+<h2>Figures</h2>
+<p>A figure sits on faint graph paper that fades into the page. Draw diagrams as inline SVG so the text stays crisp and selectable. Cards have square
+corners and a hard offset shadow; arrows are thin with an open head; a butter-yellow box is for an annotation.</p>
+
+<div class="wide"><figure><div class="paper">
+<svg viewBox="0 0 680 300" role="img" aria-labelledby="ct dc"><title id="ct">A line chart with two series</title><desc id="dc">Series A rises from 20 to 88 over five steps; series B rises from 12 to 63.</desc>
+<g class="grid"><line x1="60" y1="250" x2="640" y2="250"/><line x1="60" y1="192.5" x2="640" y2="192.5"/><line x1="60" y1="135" x2="640" y2="135"/><line x1="60" y1="77.5" x2="640" y2="77.5"/><line x1="60" y1="20" x2="640" y2="20"/></g>
+<line class="axis" x1="60" y1="250" x2="640" y2="250"/><line class="axis" x1="60" y1="20" x2="60" y2="250"/>
+<g class="sub" text-anchor="end"><text x="52" y="253">0</text><text x="52" y="196">25</text><text x="52" y="139">50</text><text x="52" y="81">75</text><text x="52" y="24">100</text></g>
+<g class="sub" text-anchor="middle"><text x="60" y="270">0</text><text x="176" y="270">1</text><text x="292" y="270">2</text><text x="408" y="270">3</text><text x="524" y="270">4</text><text x="640" y="270">5</text></g>
+<text class="sub" x="350" y="290" text-anchor="middle">training step (thousands)</text>
+<polyline points="60,204 176,162.6 292,123.5 408,98.2 524,66 640,47.6" fill="none" stroke="#E5C65B" stroke-width="1.5"/>
+<polyline points="60,222.4 176,192.5 292,171.8 408,135 524,116.6 640,105.1" fill="none" stroke="#4C7E4D" stroke-width="1.5"/>
+<g stroke="#000" stroke-width="1"><circle cx="60" cy="204" r="4" fill="#E5C65B"/><circle cx="176" cy="162.6" r="4" fill="#E5C65B"/><circle cx="292" cy="123.5" r="4" fill="#E5C65B"/><circle cx="408" cy="98.2" r="4" fill="#E5C65B"/><circle cx="524" cy="66" r="4" fill="#E5C65B"/><circle cx="640" cy="47.6" r="4" fill="#E5C65B"/>
+<circle cx="60" cy="222.4" r="4" fill="#4C7E4D"/><circle cx="176" cy="192.5" r="4" fill="#4C7E4D"/><circle cx="292" cy="171.8" r="4" fill="#4C7E4D"/><circle cx="408" cy="135" r="4" fill="#4C7E4D"/><circle cx="524" cy="116.6" r="4" fill="#4C7E4D"/><circle cx="640" cy="105.1" r="4" fill="#4C7E4D"/></g>
+<text class="bold" x="560" y="56">A</text><text class="bold" x="560" y="130">B</text>
+<defs><marker id="ar-c" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="#000" stroke-width="1.3"/></marker></defs>
+<rect x="373" y="173" width="190" height="52" fill="#000"/><rect x="370" y="170" width="190" height="52" fill="#FBD45B" stroke="#000"/>
+<text class="small" x="465" y="190" text-anchor="middle">one callout per chart:</text><text class="small" x="465" y="205" text-anchor="middle">say what to look at</text>
+<path d="M500 168 L516 124" fill="none" stroke="#000" stroke-width="1.2" marker-end="url(#ar-c)"/>
+</svg></div><figcaption>Figure 1. Plain axes, a faint grid, thin lines, round markers with a black outline, tiny grey tick labels, one annotation.</figcaption></figure></div>
+
+<p>Colours keep one meaning across a post: if butter is series A in the first chart it is series A everywhere. Put the fill at the 400 level and the
+outline darker, the same for comparable elements.</p>
+
+<h2>Cards, callouts and facts</h2>
+<div class="card"><b>A quiet card.</b> White, a hairline border and a faint offset shadow. Use it to set a definition or an aside apart.</div>
+<div class="card strong"><b>A strong card.</b> A black border and a hard black shadow mean "look here".</div>
+<div class="callout"><b>A callout.</b> Butter yellow with a hard shadow; for one annotation at a time, not for decoration.</div>
+<div class="facts">
+<div class="fact"><b>17.2 M</b>parameters, the same for every run</div>
+<div class="fact"><b>3 runs</b>per setting, one seed each</div>
+<div class="fact"><b>1 GPU</b>for about nine hours</div>
+</div>
+<div class="chips">
+<a class="chip" href="../hello-world/index.html"><b>A first post</b><span>link card, quiet until hovered</span></a>
+<a class="chip" href="../about/index.html"><b>About</b><span>another link card</span></a>
+<a class="chip" href="#tables-and-more"><b>Jump down</b><span>to the next section</span></a>
+</div>
+
+<h2>Tables and more</h2>
+<table class="data"><thead><tr><th>Setting</th><th class="num">Score</th><th>Note</th></tr></thead><tbody>
+<tr><th>baseline</th><td class="num">0.61</td><td>no augmentation</td></tr>
+<tr><th>with augmentation</th><td class="num">0.68</td><td>flips and crops</td></tr>
+<tr><th>longer training</th><td class="num">0.70</td><td>twice the steps</td></tr></tbody></table>
+<details class="appendix"><summary>Appendix: a collapsible section</summary><p>Use these for material that a careful reader wants and a casual one does not: derivations, extra tables, the exact settings. They open and close without any script.</p></details>
+<details class="appendix"><summary>Appendix: and a second one</summary><p>Consecutive sections share their borders.</p></details>
+
+<h2>Code</h2>
+<pre><code># a block of code scrolls sideways instead of wrapping
+def smooth(xs, k=5):
+    return [sum(xs[max(0, i - k):i + 1]) / len(xs[max(0, i - k):i + 1]) for i in range(len(xs))]</code></pre>
+
+<h2>Definitions on hover</h2>
+<p>Mark a term once and a small card explains it on hover, on keyboard focus or on tap:
+<span class="term" tabindex="0" data-title="FiLM" data-tip="Feature-wise linear modulation: a learned scale and shift applied to each feature.">FiLM</span>
+and <span class="term" tabindex="0" data-title="EMA" data-tip="Exponential moving average of the weights, often used for evaluation.">EMA</span>.</p>
+<pre><code>&lt;span class="term" tabindex="0" data-title="EMA" data-tip="Exponential moving average of the weights."&gt;EMA&lt;/span&gt;</code></pre>
+
+<h2>Video and images</h2>
+<p>Put files in <code>content/images/</code>; they are copied to <code>images/</code>. A video gets rounded corners and spans the wide slot:</p>
+<pre><code>&lt;div class="wide"&gt;&lt;figure&gt;
+  &lt;video src="../images/demo.mp4" controls muted loop playsinline preload="metadata"&gt;&lt;/video&gt;
+  &lt;figcaption&gt;Held-out start 0, 300 frames.&lt;/figcaption&gt;
+&lt;/figure&gt;&lt;/div&gt;</code></pre>
+
+<h2>Reusable pieces</h2>
+<p>Instead of pasting the markup above, you can call it by name. A piece is a small HTML file with blanks in it; calling it fills the
+blanks, so changing how all your callouts are built means editing one file. The built-in pieces live in <code>theme/components/</code>; a file
+of the same name in <code>content/snippets/</code> replaces a built-in one, and any new file there becomes a new piece.</p>
+<pre><code>{{pill "new" color=butter}}                     a call with a plain argument and a named one
+{{#callout title="Heads up"}} ...HTML... {{/callout}}    a call that wraps content
+\{{pill}}                                       a backslash writes the braces literally</code></pre>
+<p>Live, written that way:</p>
+{{#callout title="From a shortcode"}}This callout is <code>{{#callout}}...{{/callout}}</code>; the title is optional and disappears when left out.{{/callout}}
+{{#facts}}{{fact value="18" label="components"}}{{fact value="1 file" label="to change a look"}}{{fact value="0" label="dependencies"}}{{/facts}}
+<p>{{pill "plain"}} {{pill "teal" color=teal}} {{pill "butter" color=butter}} {{button "A button" href="#reusable-pieces"}}
+and a {{term "hover definition" title="Defined once" tip="Written as a term call with the definition as an argument."}}.</p>
+{{#card variant=strong}}A strong card, wrapping any HTML, including <b>other pieces</b>: {{pill "nested" color=sage}}.{{/card}}
+{{#quote cite="Someone, somewhere"}}A quotation, with an optional source.{{/quote}}
+{{#appendix title="Appendix: a collapsible section from a shortcode"}}<p>Wrapped content goes here.</p>{{/appendix}}
+<p>The built-in pieces, and what they take:</p>
+<table class="data"><thead><tr><th>Call</th><th>Gives you</th></tr></thead><tbody>
+<tr><th><code>callout</code> <code>card</code></th><td>wrapping: <code>title</code> (callout), <code>variant=strong</code> (card)</td></tr>
+<tr><th><code>facts</code> + <code>fact</code></th><td>a row of key numbers: <code>value</code>, <code>label</code></td></tr>
+<tr><th><code>chips</code> + <code>chip</code></th><td>link cards: <code>href</code>, <code>title</code>, <code>text</code></td></tr>
+<tr><th><code>pill</code> <code>button</code></th><td>one plain argument (the label); <code>color=teal|butter|sage</code>, <code>href</code></td></tr>
+<tr><th><code>figure</code> + <code>svg</code></th><td>a wide figure on graph paper, wrapping an <code>{{svg file.svg}}</code> from <code>content/images/</code>; <code>caption</code></td></tr>
+<tr><th><code>image</code> <code>video</code></th><td><code>src</code> (a path inside the site, such as <code>images/pic.png</code>), <code>alt</code> or <code>label</code> (required), <code>caption</code></td></tr>
+<tr><th><code>wide</code> <code>full</code></th><td>wrapping: put anything in the wider slots</td></tr>
+<tr><th><code>term</code></th><td>a hover definition: the word, <code>tip</code>, optional <code>title</code></td></tr>
+<tr><th><code>quote</code> <code>appendix</code> <code>draft</code></th><td>wrapping: <code>cite</code>; <code>title</code>; <code>title</code> (removed by <code>--publish</code>)</td></tr>
+</tbody></table>
+
+<h2>Footnotes and draft notes</h2>
+<p>A footnote marker<sup class="fn"><a href="#fn1" id="r1">1</a></sup> links to a numbered list at the end of the post. A note for yourself goes in
+<code>class="draft-only"</code> and disappears in the published build:</p>
+<div class="draft-only"><b>Draft note</b>This box is visible while you build locally and absent from the page source after <code>--publish</code>.</div>
+<ol class="footnotes"><li id="fn1">Footnotes are an ordinary ordered list; the one you arrive from is highlighted. <a href="#r1">Back to the text.</a></li></ol>

@@ -1,0 +1,23 @@
+{
+  "title": "Your Name",
+  "author": "Your Name",
+  "description": "Notes, experiments and write-ups.",
+  "url": "",
+  "lang": "en",
+  "intro": "<p>I write about what I am building and what I learned from it. Replace this paragraph with two or three sentences about you and what readers will find here.</p>",
+  "nav": [
+    {
+      "label": "Posts",
+      "href": "index.html#posts"
+    },
+    {
+      "label": "About",
+      "href": "about/index.html"
+    },
+    {
+      "label": "Components",
+      "href": "components/index.html"
+    }
+  ],
+  "footer": "<p>&copy; Your Name. Text and figures are yours; change this line in site.json.</p>"
+}
