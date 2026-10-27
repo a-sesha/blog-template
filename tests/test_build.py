@@ -313,3 +313,12 @@ def test_command_line_reports_errors_without_a_traceback(tmp_path, capsys, monke
 def test_only_the_labels_of_the_header_block_are_grey_not_the_tag_pills_inside_a_value():
     css = (ROOT / "theme" / "style.css").read_text(encoding="utf-8")
     assert ".meta>span:nth-child(odd){" in css and ".meta span:nth-child(odd)" not in css
+
+
+def test_every_font_family_ships_with_its_licence_text():
+    """Redistributing the fonts under the Open Font License requires the licence text to travel with them."""
+    fonts = ROOT / "theme" / "fonts"
+    families = {p.name.rsplit("-latin-", 1)[0] for p in fonts.glob("*.woff2")}
+    assert families == {"cormorant-garamond", "ibm-plex-mono", "source-sans-3"}
+    licences = list(fonts.glob("OFL-*.txt"))
+    assert len(licences) == 3 and all("SIL OPEN FONT LICENSE Version 1.1" in p.read_text(encoding="utf-8") for p in licences)

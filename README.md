@@ -144,5 +144,5 @@ drafts left out of the feed, draft notes absent from the published source, uniqu
 
 ## Licence
 
-Code and theme: not chosen yet, add a `LICENSE` file before you share the repository. Fonts: SIL Open Font License 1.1 (see
-`theme/fonts/README.md`).
+Code and theme: no licence has been chosen yet, so by default nobody else may reuse them; add a `LICENSE` file (for example MIT) to
+allow it. Fonts: SIL Open Font License 1.1, with the licence texts in `theme/fonts/`.
