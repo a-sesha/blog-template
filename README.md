@@ -68,6 +68,21 @@ Plain HTML with class names; see `content/posts/components.html` (and the page i
 Headings (`<h2>`, `<h3>` without attributes) get an address and a self-link automatically. Put images and video in
 `content/images/` and refer to them as `../images/name.ext` from a post.
 
+## One engine, several sites
+
+The code, the theme and the built-in pieces are the engine; a site is just a folder with `site.json` and `content/`. Keep your
+real site in its own repository and build it with this one:
+
+```bash
+python build.py --site ../my-blog              # reads ../my-blog, writes ../my-blog/public
+python build.py --site ../my-blog --publish --check
+```
+
+A site can leave out `theme/` entirely. A file under the site's `theme/` replaces the engine's file of the same name
+(`theme/style.css`, `theme/layout.html`, a font), and a piece in `theme/components/` or `content/snippets/` replaces a
+built-in one; the order is the site's `content/snippets/`, the site's `theme/components/`, then the engine's. Building a site never
+writes into the engine's folder. This folder is itself a complete example site (the default when you pass no `--site`).
+
 ## A post with its own files
 
 For a post with media, data or custom scripts, put a folder next to its file: `content/posts/my-post.html` and
