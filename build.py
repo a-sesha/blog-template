@@ -456,8 +456,8 @@ def entry_main(site, e, publish, root_dir=ROOT, engine=None):
     meta = []
     if e["date"]:
         meta += ["Published", fmt_date(e["date"])]
-    meta += ["Authors", esc(e["authors"] or site["author"])]
     if e["kind"] == "post":
+        meta += ["Authors", esc(e["authors"] or site["author"])]
         meta += ["Reading time", f"{reading_minutes(body)} min"]
     if e["tags"]:
         meta += ["Tags", "".join(f'<span class="pill">{esc(t)}</span>' for t in e["tags"])]
