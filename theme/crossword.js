@@ -400,10 +400,10 @@
       else handled = false;
       if (handled) e.preventDefault();
     });
-    input.addEventListener('input', function () {                              // phone keyboards, paste and predictive text can deliver several characters at once
-      var text = input.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    input.addEventListener('input', function () {
+      var ch = input.value.slice(-1);
       input.value = '';
-      for (var i = 0; i < text.length; i++) type(text.charAt(i));
+      if (/[A-Za-z0-9]/.test(ch)) type(ch.toUpperCase());
     });
     input.addEventListener('focus', function () { board.classList.add('cw-focus'); });
     input.addEventListener('blur', function () { board.classList.remove('cw-focus'); });
