@@ -62,9 +62,10 @@ def test_blocks_can_be_null_or_a_custom_block_marker_and_circles_and_dict_cells_
     doc["solution"][2][2] = {"value": "h"}
     puzzle = B.read_ipuz(write(tmp_path, doc), "x")
     assert puzzle["grid"] == ["ABC", "D#E", "FGH"] and puzzle["circles"] == [[0, 0]]
-    custom = ipuz(["AB", "CD"], {1: "x", 3: "y"}, {1: "z", 2: "w"}, block="X")
-    custom["solution"] = [["A", "B"], ["C", "D"]]
-    assert B.read_ipuz(write(tmp_path, custom, "c.ipuz"), "x")["grid"] == ["AB", "CD"]
+    custom = ipuz(["AB", "C#"], {1: "x"}, {1: "z"}, block="X")
+    custom["solution"][1][1] = "X"
+    custom["puzzle"][1][1] = "X"
+    assert B.read_ipuz(write(tmp_path, custom, "c.ipuz"), "x")["grid"] == ["AB", "C#"]
 
 
 def test_a_jsonp_wrapper_and_a_bom_are_tolerated(tmp_path):
@@ -186,29 +187,35 @@ def test_reading_time_must_be_true_or_false(tmp_path):
 
 
 # ---- the player itself (no JavaScript runtime here: check the contract between page, script and styles) -------------------------------------------
+def player_code():
+    """crossword.js without its comments: a handler that is only mentioned in one must not satisfy a test."""
+    text = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
+    return re.sub(r"(?m)^\s*//.*$|\s//\s.*$", "", re.sub(r"/\*.*?\*/", "", text, flags=re.S))
+
+
 def test_the_player_script_and_styles_exist_and_agree_on_the_class_names():
-    js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
+    js = player_code()
     css = (ROOT / "theme" / "style.css").read_text(encoding="utf-8")
     classes = set(re.findall(r"cw-[a-z]+(?:-[a-z]+)*", js))                    # every class the script mentions
-    missing = sorted(c for c in classes if f".{c}" not in css)
+    missing = sorted(c for c in classes if not re.search(rf"\.{c}(?![\w-])", css))
     assert not missing, missing
     assert "script.crossword-data" in js and "blog-crossword:" in js and "localStorage" in js
 
 
 def test_the_player_never_writes_data_as_html():
-    js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
+    js = player_code()
     assert "innerHTML" not in js and "eval(" not in js and "document.write" not in js
 
 
 def test_the_finishing_flourish_is_switched_off_for_readers_who_ask_for_less_motion_and_only_follows_a_clean_solve():
     css = (ROOT / "theme" / "style.css").read_text(encoding="utf-8")
     assert re.search(r"@media \(prefers-reduced-motion:reduce\)\{[^}]*\.cw-wave[^}]*animation:none", css)
-    js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
+    js = player_code()
     assert "helpedCount() === 0" in js and "cw-solved" in js and "cw-wave" in js                  # no celebration when squares were revealed
 
 
 def test_open_menus_close_on_an_outside_click_escape_tab_away_and_when_the_other_opens():
-    js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
+    js = player_code()
     assert "document.addEventListener('click'" in js and "m.contains(e.target)" in js
     assert "'Escape'" in js and "addEventListener('focusout'" in js and "addEventListener('toggle'" in js
 
