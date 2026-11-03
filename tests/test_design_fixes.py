@@ -11,8 +11,9 @@ CSS = (ROOT / "theme" / "style.css").read_text(encoding="utf-8")
 
 
 def dark_tokens():
-    block = re.search(r"@media \(prefers-color-scheme:dark\)\{:root\[data-scheme=\"auto\"\]\{(.*?)\}\}", CSS, re.S).group(1)
-    return dict(re.findall(r"--([\w-]+):\s*(#[0-9A-Fa-f]{6})", block))
+    block = re.search(r"@media\s+screen\s+and\s+\(prefers-color-scheme:\s*dark\)\s*\{\s*:root\[data-scheme=[\"']auto[\"']\]\s*\{(.*?)\}\s*\}", CSS, re.S)
+    assert block, "the dark palette must sit in @media screen and (prefers-color-scheme:dark){:root[data-scheme=auto]{...}}"
+    return dict(re.findall(r"--([\w-]+)\s*:\s*(#[0-9A-Fa-f]{6})", block.group(1)))
 
 
 def light_tokens():
@@ -146,9 +147,11 @@ def test_an_unknown_or_badly_declared_section_is_a_message(tmp_path):
             B.load_site(make_site(tmp_path / f"b{len(str(bad))}", sections=bad))
 
 
-def test_bare_nav_rules_do_not_exist_so_the_contents_box_is_not_reshaped():
+def test_every_nav_rule_is_scoped_to_the_site_header_so_the_contents_box_is_not_reshaped():
     """A post's "On this page" box is a <nav> too; the header's tap-target styling must stay scoped to header.site."""
-    assert not re.search(r"(?m)^nav", CSS)
+    selectors = re.findall(r"(?m)^([^{}/@]*\bnav\b[^{]*)\{", CSS)
+    assert selectors and all(sel.strip().startswith("header.site") for sel in selectors), selectors
+    assert not re.search(r"(?m)^\s*nav\b", CSS)
 
 
 # ---- one page per section -------------------------------------------------------------------------------------------------------------
@@ -310,3 +313,151 @@ def test_author_pages_must_be_a_boolean_and_cannot_clash_with_a_section(tmp_path
     site = make_site(tmp_path / "b", posts={"a.html": post()}, author_pages=True, sections=[{"id": "authors", "heading": "Authors"}])
     with pytest.raises(B.BuildError, match="cannot use the address 'authors'"):
         B.build(site, site / "public")
+
+
+# ---- review round: CSS ------------------------------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize("attr,literal,token", [("fill", "#fff", "surface"), ("fill", "#000", "ink"), ("stroke", "#000", "ink"), ("fill", "#EEEDE8", "tab"),
+                                                ("fill", "rgba(44,40,26,.09)", "shadow-soft"), ("stroke", "#B4B3AF", "rule"), ("fill", "#F5F4EF", "paper")])
+def test_every_literal_figure_colour_is_mapped_onto_its_token(attr, literal, token):
+    pattern = rf'\.paper svg \[{attr}="{re.escape(literal)}"\]\s*\{{\s*{attr}\s*:\s*var\(--{token}\)'
+    assert re.search(pattern, CSS), (attr, literal, token)
+
+
+def test_note_text_in_figures_stays_dark_on_butter():
+    assert re.search(r"\.paper svg text\.note\s*\{\s*fill\s*:\s*var\(--on-butter\)", CSS)
+
+
+def test_every_rule_with_a_butter_background_also_sets_the_dark_text_colour():
+    for body in re.findall(r"\{([^{}]*)\}", CSS):
+        if re.search(r"background\s*:\s*var\(--butter\)", body):
+            assert re.search(r"color\s*:\s*var\(--on-butter\)", body), body
+
+
+def test_links_code_and_focus_rings_inside_the_butter_highlight_use_the_dark_text_colour():
+    assert re.search(r"\.callout a[^{]*\{[^}]*color:var\(--on-butter\)", CSS)
+    assert re.search(r"\.callout code[^{]*\{[^}]*color:var\(--on-butter\)", CSS)
+    assert re.search(r"\.callout :focus-visible[^{]*\{[^}]*outline-color:var\(--on-butter\)", CSS)
+
+
+def test_no_colour_keywords_outside_the_tokens():
+    body = re.sub(r"/\*.*?\*/", "", CSS.split(".skip{", 1)[1], flags=re.S)
+    body = re.sub(r"@media print\{.*", "", body)
+    assert not re.search(r"\b(?:black|white)\b", body, re.I)
+
+
+def test_only_links_lift_on_hover_not_every_chip_and_wide_grids_cannot_force_overflow():
+    assert "a.chip:hover" in CSS and not re.search(r"(?m)^\.chip:hover", CSS)
+    assert "repeat(3,minmax(0,1fr))" in CSS and "overflow-wrap:anywhere" in CSS
+    assert not re.search(r"grid-template-columns:\s*1fr\s*[}\]]", CSS) and "grid-template-columns:repeat(3,1fr)" not in CSS
+
+
+def test_the_dark_palette_applies_to_screens_not_to_print():
+    assert re.search(r"@media\s+screen\s+and\s+\(prefers-color-scheme:\s*dark\)", CSS)
+
+
+# ---- review round: config types ------------------------------------------------------------------------------------------------------------------
+@pytest.mark.parametrize("key,value,match", [
+    ("sections", None, "'sections' must be a list"), ("nav", None, "'nav' must be a list"), ("posts_slug", 5, "'posts_slug' must be text"),
+    ("posts_slug", None, "'posts_slug' must be text"), ("posts_heading", None, "'posts_heading' must be text"), ("posts_heading", 5, "'posts_heading' must be text"),
+    ("title", 5, "'title' must be text"), ("description", None, "'description' must be text"), ("lang", None, "'lang' must be text"),
+    ("intro", 5, "'intro' must be text"), ("url", 5, "'url' must be text"), ("footer", True, "'footer' must be text"),
+    ("footer", ["a"], "'footer' must be text"), ("dark_mode", "false", "'dark_mode' must be true or false"), ("dark_mode", 1, "'dark_mode' must be true or false"),
+])
+def test_wrong_typed_site_json_values_are_messages_not_tracebacks(tmp_path, key, value, match):
+    with pytest.raises(B.BuildError, match=match):
+        B.load_site(make_site(tmp_path, **{key: value}))
+
+
+def test_section_addresses_and_posts_slug_reject_reserved_names_with_the_right_message(tmp_path):
+    with pytest.raises(B.BuildError, match="must look like"):
+        B.load_site(make_site(tmp_path / "p", sections=[{"id": "posts", "heading": "X"}], posts_slug="musings"))
+    for i, slug in enumerate(("theme", "images", "feed", "sitemap", "index", "content")):
+        with pytest.raises(B.BuildError, match="not a usable section address"):
+            B.load_site(make_site(tmp_path / f"s{i}", sections=[{"id": slug, "heading": "X"}]))
+        with pytest.raises(B.BuildError, match="not a usable section address"):
+            B.load_site(make_site(tmp_path / f"q{i}", posts_slug=slug))
+    with pytest.raises(B.BuildError, match="must be unique"):
+        B.load_site(make_site(tmp_path / "d", sections=SECTIONS + SECTIONS))
+
+
+# ---- review round: sections and drafts -----------------------------------------------------------------------------------------------------
+def test_a_section_page_has_its_own_title_canonical_feed_link_stylesheet_and_an_escaped_heading(tmp_path):
+    site = make_site(tmp_path, posts={"x.html": post(section="q")}, sections=[{"id": "q", "heading": "A & B"}], pages={"about.html": ABOUT})
+    out = build_out(site)
+    page = (out / "q" / "index.html").read_text(encoding="utf-8")
+    assert "<h1>A &amp; B</h1>" in page and "<title>A &amp; B | Test Blog</title>" in page
+    assert '<link rel="canonical" href="https://blog.example/q/index.html">' in page
+    assert 'rel="alternate" type="application/atom+xml"' in page and 'href="../theme/style.css"' in page
+
+
+def test_a_draft_section_entry_is_hidden_on_its_section_page_when_publishing_and_badged_otherwise(tmp_path):
+    site = make_site(tmp_path, posts={"d.html": post(title="Secret", section="crosswords", draft="true")}, sections=SECTIONS, pages={"about.html": ABOUT})
+    assert "Secret" not in (build_out(site, publish=True) / "crosswords" / "index.html").read_text(encoding="utf-8")
+    page = (build_out(site) / "crosswords" / "index.html").read_text(encoding="utf-8")
+    assert "Secret" in page and "draft</span>" in page
+
+
+def test_an_address_clash_or_unknown_section_in_a_draft_is_reported_even_when_publishing(tmp_path):
+    site = make_site(tmp_path / "a", posts={"x.html": post()}, sections=SECTIONS)
+    (site / "content" / "drafts").mkdir()
+    (site / "content" / "drafts" / "crosswords.html").write_text(post(), encoding="utf-8")
+    with pytest.raises(B.BuildError, match="is a section page"):
+        B.build(site, site / "public", publish=True)
+    site = make_site(tmp_path / "b", posts={"x.html": post()}, sections=SECTIONS)
+    (site / "content" / "drafts").mkdir()
+    (site / "content" / "drafts" / "d.html").write_text(post(section="zz"), encoding="utf-8")
+    with pytest.raises(B.BuildError, match="section 'zz' is not listed"):
+        B.build(site, site / "public", publish=True)
+
+
+def test_a_section_called_content_and_a_heading_called_content_cannot_make_duplicate_ids(tmp_path):
+    site = make_site(tmp_path, posts={"a.html": post(body="<h2>Content</h2><p>x</p>")}, pages={"about.html": ABOUT})
+    page = (build_out(site) / "a" / "index.html").read_text(encoding="utf-8")
+    ids = re.findall(r'\bid="([^"]+)"', page)
+    assert len(ids) == len(set(ids)) and 'id="content-2"' in page
+
+
+def test_two_sections_keep_the_order_of_site_json_on_the_home_page_and_in_the_sitemap(tmp_path):
+    secs = [{"id": "zeta", "heading": "Zeta"}, {"id": "alpha", "heading": "Alpha"}]
+    site = make_site(tmp_path, posts={"a.html": post()}, sections=secs, pages={"about.html": ABOUT})
+    out = build_out(site)
+    home = (out / "index.html").read_text(encoding="utf-8")
+    assert home.index('id="zeta"') < home.index('id="alpha"')
+    sm = (out / "sitemap.xml").read_text(encoding="utf-8")
+    assert sm.index("/zeta/") < sm.index("/alpha/") and "\\" not in sm and "\\" not in home
+
+
+def test_nav_marks_the_current_page_for_dot_slash_and_query_forms(tmp_path):
+    for i, href in enumerate(("./crosswords/index.html", "crosswords/index.html?x=1")):
+        out = build_out(make_site(tmp_path / f"n{i}", posts={"a.html": post()}, sections=SECTIONS, pages={"about.html": ABOUT},
+                                  nav=[{"label": "Crosswords", "href": href}]))
+        assert 'aria-current="page">Crosswords' in (out / "crosswords" / "index.html").read_text(encoding="utf-8")
+
+
+def test_a_site_without_its_own_favicon_still_gets_one_and_passes_the_link_check(tmp_path):
+    site = make_site(tmp_path, posts={"a.html": post()}, pages={"about.html": ABOUT})
+    (site / "content" / "images" / "favicon.svg").unlink()
+    out = build_out(site)
+    assert (out / "images" / "favicon.svg").exists() and B.check_links(out) == []
+
+
+# ---- review round: the link checker ------------------------------------------------------------------------------------------------------------
+def test_check_links_notices_a_wrong_case_and_understands_percent_escapes_and_srcset_and_root_relative_links(tmp_path):
+    out = tmp_path / "out"
+    (out / "other").mkdir(parents=True)
+    (out / "other" / "index.html").write_text("<p>x</p>", encoding="utf-8")
+    (out / "a b.png").write_bytes(b"x")
+    page = ('<a href="other/index.html">ok</a><a href="Other/index.html">wrong case</a><img src="a%20b.png">'
+            '<img src="a b.png" srcset="a%20b.png 1x, missing.png 2x"><a href="/other/index.html">root</a><a href="/nope/index.html">root missing</a>')
+    (out / "index.html").write_text(page, encoding="utf-8")
+    problems = " | ".join(B.check_links(out))
+    assert "'Other/index.html'" in problems and "'missing.png'" in problems and "'/nope/index.html'" in problems
+    assert "a%20b.png" not in problems and "'other/index.html'" not in problems and "'/other/index.html'" not in problems
+
+
+def test_the_default_footer_names_the_author_and_the_year_and_an_empty_footer_is_the_default(tmp_path):
+    import datetime
+    for i, footer in enumerate(("", None)):
+        over = {} if footer is None else {"footer": footer}
+        home = build_home(tmp_path / f"f{i}", **over)
+        assert f"&copy; {datetime.date.today().year} A. Writer</p></footer>" in home

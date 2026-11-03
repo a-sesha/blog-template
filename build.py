@@ -27,7 +27,9 @@ import datetime as dt
 import html
 import json
 import re
+import os
 import unicodedata
+from urllib.parse import unquote
 import shlex
 import shutil
 import sys
@@ -40,6 +42,7 @@ MARKER = ".blog-template-build"
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 RESERVED = {"theme", "images", "feed", "sitemap", "index"}
 SLUG = re.compile(r"[a-z0-9][a-z0-9-]*\Z")
+SECTION_RESERVED = RESERVED | {"content"}                 # section addresses are also ids on the home page; "content" is <main>
 
 
 class BuildError(Exception):
@@ -130,6 +133,14 @@ def load_site(root=ROOT):
     for key in ("title", "author"):
         if not site.get(key):
             raise BuildError(f"site.json: '{key}' is required")
+    for key in ("title", "author", "lang", "description", "intro", "url", "posts_heading", "posts_slug"):
+        if key in site and not isinstance(site[key], str):
+            raise BuildError(f"site.json: '{key}' must be text")
+    for key in ("nav", "sections"):
+        if key in site and not isinstance(site[key], list):
+            raise BuildError(f"site.json: '{key}' must be a list")
+    if "footer" in site and not (isinstance(site["footer"], str) or site["footer"] is False):
+        raise BuildError("site.json: 'footer' must be text (HTML), or false for no footer")
     for i, item in enumerate(site.get("nav", [])):
         if not (isinstance(item, dict) and isinstance(item.get("label"), str) and isinstance(item.get("href"), str)):
             raise BuildError(f"site.json: nav item {i + 1} must look like {{\"label\": \"About\", \"href\": \"about/index.html\"}}")
@@ -142,8 +153,8 @@ def load_site(root=ROOT):
     if len(set(slugs)) != len(slugs):
         raise BuildError("site.json: section ids, and posts_slug, must be unique")
     for slug in slugs:
-        if not SLUG.match(slug) or slug in RESERVED:
-            raise BuildError(f"site.json: '{slug}' is not a usable section address; use lower-case letters, digits and '-' (reserved: {sorted(RESERVED)})")
+        if not SLUG.match(slug) or slug in SECTION_RESERVED:
+            raise BuildError(f"site.json: '{slug}' is not a usable section address; use lower-case letters, digits and '-' (reserved: {sorted(SECTION_RESERVED)})")
     if site.get("url") and not re.match(r"https?://[^/\s]+", site["url"]):
         raise BuildError("site.json: 'url' must start with https:// (or http://), for example https://you.example")
     site.setdefault("lang", "en")
@@ -392,7 +403,7 @@ def slugify(text):
 
 def add_heading_ids(body):
     """Give plain <h2>/<h3> headings an id and a self-link; returns (body, [(id, text) of the h2 headings])."""
-    used, toc = set(re.findall(r'\bid="([^"]+)"', body)), []
+    used, toc = set(re.findall(r'\bid="([^"]+)"', body)) | {"content"}, []      # "content" is the page's own <main id>
 
     def repl(m):
         level, given, inner = m.group(1), re.search(r'id="([^"]*)"', m.group(2)), m.group(3)
@@ -444,7 +455,8 @@ def nav_html(site, root, current):
         href = safe_url(item["href"], "site.json nav")
         local = not re.match(r"([a-z][a-z0-9+.-]*:|#|/)", href, re.I)
         target = root + href if local else href
-        cur = ' aria-current="page"' if local and href.split("#")[0].rstrip("/") in (current, current + "/index.html") else ""
+        page = re.sub(r"^(\./)+", "", href.split("#")[0].split("?")[0]).rstrip("/")
+        cur = ' aria-current="page"' if local and page in (current, current + "/index.html") else ""
         items.append(f'<a href="{esc(target)}"{cur}>{esc(item["label"])}</a>')
     return "".join(items)
 
@@ -632,12 +644,13 @@ def build(root=ROOT, out=None, publish=False, engine=None):
     layout = root / "theme" / "layout.html"
     site = load_site(root)
     template = (layout if layout.exists() else engine / "theme" / "layout.html").read_text(encoding="utf-8")
-    entries = [e for e in load_entries(root) if not (publish and e["draft"])]
+    loaded = load_entries(root)
+    entries = [e for e in loaded if not (publish and e["draft"])]
     known = {s["id"] for s in site["sections"]}
-    for e in entries:
+    for e in loaded:
         if e["section"] and e["section"] not in known:
             raise BuildError(f"{e['source']}: section '{e['section']}' is not listed under \"sections\" in site.json (known: {sorted(known) or 'none'})")
-    for e in entries:
+    for e in loaded:
         if site["author_pages"] and e["slug"] == "authors":
             raise BuildError(f"{e['source']}: the address 'authors' is used by the author pages (site.json \"author_pages\"); give the file another name or a slug")
         if e["slug"] in section_slugs(site):
@@ -655,6 +668,9 @@ def build(root=ROOT, out=None, publish=False, engine=None):
         shutil.copytree(root / "theme", out / "theme", ignore=skip, dirs_exist_ok=True)         # the site's own files win
     if (root / "content" / "images").exists():
         shutil.copytree(root / "content" / "images", out / "images")
+    if not (out / "images" / "favicon.svg").exists():                  # the layout links it on every page
+        (out / "images").mkdir(exist_ok=True)
+        shutil.copy(engine / "content" / "images" / "favicon.svg", out / "images" / "favicon.svg")
     (out / "index.html").write_text(page_html(
         site, template, title=site["title"], description=site["description"], root="", current="index.html",
         main=home_main(site, posts, publish, root, engine), canonical_path="index.html", has_feed=has_feed), encoding="utf-8")
@@ -711,11 +727,31 @@ class RefCollector(HTMLParser):
         for key in ("href", "src", "poster"):
             if a.get(key) and not (tag == "a" and key == "src"):
                 self.refs.append((tag, a[key]))
+        if a.get("srcset"):
+            for candidate in a["srcset"].split(","):
+                if candidate.split():
+                    self.refs.append((tag, candidate.split()[0]))
+
+
+def exists_exactly(out, target, listed):
+    """True when `target` exists with exactly this spelling: a case-insensitive disk (Windows, macOS) would hide a 404 on a host that cares."""
+    try:
+        parts = Path(os.path.normpath(target)).relative_to(os.path.normpath(out)).parts
+    except ValueError:
+        return Path(target).exists()
+    here = Path(os.path.normpath(out))
+    for part in parts:
+        if here not in listed:
+            listed[here] = set(os.listdir(here)) if here.is_dir() else set()
+        if part not in listed[here]:
+            return False
+        here = here / part
+    return True
 
 
 def check_links(out):
     """Problems in the built site: a link, image, script, stylesheet, font or #anchor that points at nothing."""
-    out, problems, parsed = Path(out), [], {}
+    out, problems, parsed, listed = Path(out), [], {}, {}
 
     def collect(path):
         if path not in parsed:
@@ -728,11 +764,15 @@ def check_links(out):
             if re.match(r"([a-z][a-z0-9+.-]*:|//)", ref, re.I):
                 continue                                                       # external, mailto:, data: ...
             path_part, _, frag = ref.partition("#")
-            target = page if not path_part else (page.parent / path_part.split("?")[0])
+            path_part, frag = unquote(path_part), unquote(frag)
+            if path_part.startswith("/"):
+                target = out / path_part.split("?")[0].lstrip("/")                    # a root-relative address starts at the site root
+            else:
+                target = page if not path_part else (page.parent / path_part.split("?")[0])
             if target.is_dir() or path_part.endswith("/"):
                 target = target / "index.html"
             rel = page.relative_to(out)
-            if not target.exists():
+            if not exists_exactly(out, target, listed):
                 problems.append(f"{rel}: <{tag}> points at {ref!r}, which does not exist")
             elif frag and target.suffix == ".html" and frag not in collect(target).ids:
                 problems.append(f"{rel}: {ref!r} has no element with id {frag!r}")

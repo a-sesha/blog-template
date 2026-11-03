@@ -29,7 +29,7 @@
 }
 /* Dark scheme: the same tokens, inked on dark paper. Off unless site.json sets "dark_mode": true (the page then carries data-scheme="auto"
    and follows the reader's system setting); posts with hard-coded colours of their own stay readable that way. The tests check its contrast. */
-@media (prefers-color-scheme:dark){:root[data-scheme="auto"]{
+@media screen and (prefers-color-scheme:dark){:root[data-scheme="auto"]{
   --paper:#17160F; --ink:#EEEBDF; --muted:#6F6B54; --muted-2:#A9A596; --rule:#45433A;
   --btn:#34332B; --btn-ink:#DAD8CC; --btn-hover:#403F36;
   --forest:#7DB07E; --teal:#2A4547; --sage:#3A4426; --greige:#2A2922;
@@ -112,7 +112,7 @@ figure{margin:0}
 .paper svg text{font-family:var(--mono);fill:var(--ink)}
 /* Inline figures are drawn with literal colours; these rules map the paper-and-ink ones onto the tokens so they follow the colour scheme.
    Text on a butter shape takes class="note" (stays black in both schemes). */
-.paper svg [fill="#fff"]{fill:var(--surface)}.paper svg [fill="#000"]{fill:var(--ink)}.paper svg [stroke="#000"]{stroke:var(--ink)}
+.paper svg [fill="#fff"]{fill:var(--surface)}.paper svg [fill="#F5F4EF"]{fill:var(--paper)}.paper svg [fill="#000"]{fill:var(--ink)}.paper svg [stroke="#000"]{stroke:var(--ink)}
 .paper svg [fill="#EEEDE8"]{fill:var(--tab)}.paper svg [fill="rgba(44,40,26,.09)"]{fill:var(--shadow-soft)}.paper svg [stroke="#B4B3AF"]{stroke:var(--rule)}
 .paper svg text.note{fill:var(--on-butter)}
 svg .bold{font-weight:600;font-size:11px}svg .small{font-size:10px}
@@ -128,17 +128,21 @@ video{display:block;width:100%;height:auto;border-radius:8px;background:#000}
 .card.strong{border-color:var(--ink);box-shadow:3px 3px 0 var(--ink)}
 .callout{background:var(--butter);color:var(--on-butter);border:1px solid var(--on-butter);box-shadow:3px 3px 0 var(--on-butter);padding:10px 14px;margin:18px 0 26px;font-family:var(--mono);font-size:12.5px;line-height:1.5}
 .callout b{font-weight:600}
+.callout a,.callout a:hover,mark a,mark a:hover,ol.footnotes li:target a,.pill.butter a{color:var(--on-butter)}
+.callout code,mark code,ol.footnotes li:target code{color:var(--on-butter);background:rgba(255,255,255,.45)}
+.callout :focus-visible,mark :focus-visible,.pill.butter:focus-visible{outline-color:var(--on-butter)}
 .callout b:empty,blockquote cite:empty,figcaption:empty{display:none}                 /* optional parts of a component simply vanish when left out */
-.facts{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:18px 0}
+.facts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:18px 0}
 .fact{background:var(--surface);border:1px solid var(--rule);box-shadow:3px 3px 0 var(--shadow-soft);padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--muted-2);line-height:1.45}
 .fact b{display:block;color:var(--ink);font-weight:600;font-size:15px}
 .chips{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px;margin:12px 0 24px}
 .chip{display:block;background:var(--surface);border:1px solid var(--rule);box-shadow:3px 3px 0 var(--shadow-soft);padding:14px 16px;text-decoration:none;color:var(--ink);font-family:var(--mono);font-size:12px;line-height:1.5;
   transition:transform .12s,box-shadow .12s}
-.chip:hover{border-color:var(--ink);box-shadow:5px 5px 0 var(--ink);transform:translate(-1px,-1px);color:var(--ink)}
+a.chip:hover{border-color:var(--ink);box-shadow:5px 5px 0 var(--ink);transform:translate(-1px,-1px);color:var(--ink)}
 .chip b{display:block;font-size:15px;margin-bottom:4px}.chip span{color:var(--muted-2)}
-@media (prefers-reduced-motion:reduce){.chip{transition:none}.chip:hover{transform:none}}
-@media (max-width:640px){h1{font-size:40px}h2{font-size:26px}.facts,.chips{grid-template-columns:1fr}.lede{font-size:18px}}
+@media (prefers-reduced-motion:reduce){.chip{transition:none}a.chip:hover{transform:none}}
+.chip,.fact{overflow-wrap:anywhere}
+@media (max-width:640px){h1{font-size:40px}h2{font-size:26px}.facts,.chips{grid-template-columns:minmax(0,1fr)}.lede{font-size:18px}}
 
 /* ---- tables and disclosure ---------------------------------------------------------------------------------- */
 table.data{width:100%;border-collapse:collapse;font-size:14px;line-height:1.5;margin:6px 0 18px}
@@ -167,14 +171,14 @@ ol.footnotes li:target{background:var(--butter);color:var(--on-butter)}
 
 /* ---- post list on the home page ------------------------------------------------------------------------------------ */
 ul.entries{list-style:none;padding:0;margin:0}
-.entry{display:grid;grid-template-columns:104px 1fr;column-gap:16px;padding:16px 0;border-top:1px solid var(--rule);margin:0}
+.entry{display:grid;grid-template-columns:104px minmax(0,1fr);column-gap:16px;padding:16px 0;border-top:1px solid var(--rule);margin:0}
 .entry:last-child{border-bottom:1px solid var(--rule)}
 .entry .count{font-family:var(--mono);font-size:12px;color:var(--muted-2);padding-top:6px}
 .entry time{font-family:var(--mono);font-size:12px;color:var(--muted-2);padding-top:6px}
 .entry a.title{font-family:var(--serif);font-size:26px;line-height:1.15;color:var(--ink);text-decoration:none;border-bottom:1px solid transparent}
 .entry a.title:hover{border-bottom-color:var(--ink)}
 .entry p{margin:4px 0 0;font-size:15px;color:var(--muted-2)}
-@media (max-width:640px){.entry{grid-template-columns:1fr}.entry time{padding:0 0 2px}}
+@media (max-width:640px){.entry{grid-template-columns:minmax(0,1fr)}.entry time{padding:0 0 2px}}
 
 footer.credit{border-top:1px dashed var(--ink);margin-top:72px;padding:8px 0 40px}
 footer.credit p{font-size:14px;color:var(--muted-2);line-height:1.6;margin:8px 0 0}
