@@ -199,7 +199,7 @@ def test_reading_time_ignores_markup_scripts_and_svg():
 
 def test_titles_and_descriptions_are_escaped_everywhere(tmp_path):
     nasty = 'Fish & "Chips" <script>alert(1)</script>'
-    make_site(tmp_path, posts={"a.html": post(nasty, description=nasty, tags=nasty, authors=nasty)})
+    make_site(tmp_path, posts={"a.html": post(nasty, description=nasty, authors=nasty)})
     B.build(tmp_path, tmp_path / "out")
     for f in ("index.html", "a/index.html", "feed.xml"):
         text = (tmp_path / "out" / f).read_text(encoding="utf-8")
@@ -208,12 +208,12 @@ def test_titles_and_descriptions_are_escaped_everywhere(tmp_path):
     assert "Fish &amp; &quot;Chips&quot;" in (tmp_path / "out" / "a" / "index.html").read_text(encoding="utf-8")
 
 
-def test_the_header_block_shows_date_authors_reading_time_tags_and_links(tmp_path):
-    make_site(tmp_path, posts={"a.html": post(tags="x, y", links="Code | https://c.example; Paper | ../p/index.html", authors="B. Coauthor")})
+def test_the_header_block_shows_date_authors_reading_time_and_links(tmp_path):
+    make_site(tmp_path, posts={"a.html": post(links="Code | https://c.example; Paper | ../p/index.html", authors="B. Coauthor")})
     B.build(tmp_path, tmp_path / "out")
     page = (tmp_path / "out" / "a" / "index.html").read_text(encoding="utf-8")
     assert "<span>3 Feb 2026</span>" in page and "B. Coauthor" in page and "1 min" in page
-    assert page.count('class="pill"') == 2 and 'class="btn" href="https://c.example">Code' in page and 'href="../p/index.html">Paper' in page
+    assert "Tags" not in page and 'class="pill"' not in page and 'class="btn" href="https://c.example">Code' in page and 'href="../p/index.html">Paper' in page
 
 
 def test_pages_have_no_date_or_reading_time_and_are_not_listed(tmp_path):

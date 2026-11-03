@@ -31,6 +31,12 @@ Extra home-page lists: declare them in `site.json`, e.g. `"sections": [{"id": "c
 shows only its entries: `crosswords/index.html` for a section (its `id`), and `posts/index.html` for the main list, or whatever `"posts_slug"` says
 (`"posts_slug": "musings"`). Point `nav` at those. An unknown section name, or a section address that a post or page already uses, stops the build.
 
+Author pages are off by default. Set `"author_pages": true` in `site.json` and each name in a post's `authors:` (comma-separated, default `author`)
+becomes a link to `authors/<name>/index.html`, which lists only that author's posts; `authors/index.html` lists everyone with a post count.
+Use it in `nav`. The address is the name in lower-case letters and digits with dashes (`Zoë Q. Writer` is `zoe-q-writer`); write a name the
+same way everywhere, because two spellings that make one address stop the build, as does a post or section already using `authors`.
+There are no tags: a `tags:` line in old front matter is ignored.
+
 The footer is the `footer` HTML in `site.json`; leave it empty for a copyright line, or set `"footer": false` for none. The fonts' licence texts
 ship in `theme/fonts/`; no credit line is added to the pages.
 
@@ -41,7 +47,6 @@ ship in `theme/fonts/`; no credit line is added to the pages.
 title: Required
 date: 2026-10-26             # required for posts, YYYY-MM-DD; the home page and feed are ordered by it
 description: One sentence for the home page, search results and link previews.
-tags: one, two
 authors: A. Writer, B. Coauthor     # default: author in site.json
 links: Code | https://github.com/you/repo; Paper | https://arxiv.org/abs/0000.00000   # a link left blank (`Code |` or `Code | #`) is not shown
 image: images/teaser.jpg     # link-preview image, a file in content/images/
@@ -54,7 +59,7 @@ section: crosswords          # optional; list it under that extra heading on the
 ---
 ```
 
-Reading time, the header block (Published / Authors / Reading time / Tags) and the button row are generated from this. A link in `links:` or in `nav`
+Reading time, the header block (Published / Authors / Reading time) and the button row are generated from this. A link in `links:` or in `nav`
 may not start with `javascript:` or `data:` (your own body HTML is not filtered). A mistake in a file stops the build with a message naming the file.
 
 ## Writing the body
@@ -67,7 +72,7 @@ Plain HTML with class names; see `content/posts/components.html` (and the page i
 | a figure on graph paper | `<figure><div class="paper"><svg ...></svg></div><figcaption>...</figcaption></figure>` |
 | cards, an annotation, key numbers | `.card` / `.card.strong`, `.callout`, `.facts > .fact` |
 | link cards | `.chips > a.chip` |
-| tags | `.pill`, `.pill.teal`, `.pill.butter`, `.pill.sage` |
+| small labels | `.pill`, `.pill.teal`, `.pill.butter`, `.pill.sage` |
 | buttons | `a.btn`, `button.btn`, a joined row with `.seg` (+ `aria-pressed`) |
 | tables, code, quotes | `table.data`, `pre > code`, `blockquote > p` + `cite` |
 | optional sections | `details.appendix > summary` |

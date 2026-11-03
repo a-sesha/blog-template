@@ -219,3 +219,94 @@ def test_only_the_filled_in_links_are_shown(tmp_path):
 def test_a_malformed_link_is_still_a_message(links):
     with pytest.raises(B.BuildError, match="links must look like"):
         B.parse_links(links, "f")
+
+
+# ---- no tags -----------------------------------------------------------------------------------------------------------------------------
+def test_tags_are_gone_a_tags_line_in_front_matter_is_ignored_and_no_tag_pills_appear(tmp_path):
+    site = make_site(tmp_path, posts={"a.html": post(tags="one, two")})
+    B.build(site, site / "public")
+    page = (site / "public" / "a" / "index.html").read_text(encoding="utf-8")
+    assert "Tags" not in page and ">one<" not in page and 'class="pill"' not in page
+
+
+# ---- author pages -------------------------------------------------------------------------------------------------------------------------
+ABOUT = "---\ntitle: About\n---\n<p>x</p>"
+
+
+def authors_site(tmp, posts, **over):
+    site = make_site(tmp, posts=posts, author_pages=True, pages={"about.html": ABOUT}, **over)
+    return site
+
+
+def build_out(site, **kw):
+    B.build(site, site / "public", **kw)
+    return site / "public"
+
+
+def test_authors_are_plain_text_and_no_author_pages_exist_unless_the_site_opts_in(tmp_path):
+    site = make_site(tmp_path, posts={"a.html": post(authors="A. Writer, B. Coauthor")})
+    out = build_out(site)
+    page = (out / "a" / "index.html").read_text(encoding="utf-8")
+    assert "<span>A. Writer, B. Coauthor</span>" in page and "authors/" not in page and not (out / "authors").exists()
+
+
+def test_each_author_links_to_a_page_listing_only_their_posts_and_there_is_an_index(tmp_path):
+    site = authors_site(tmp_path, {"one.html": post(title="One", authors="A. Writer, B. Coauthor"), "two.html": post(title="Two", date="2026-03-01", authors="B. Coauthor"),
+                                   "three.html": post(title="Three", date="2026-01-01", authors="C. Solo")})
+    out = build_out(site)
+    page = (out / "one" / "index.html").read_text(encoding="utf-8")
+    assert '<a href="../authors/a-writer/index.html">A. Writer</a>, <a href="../authors/b-coauthor/index.html">B. Coauthor</a>' in page
+    coauthor = (out / "authors" / "b-coauthor" / "index.html").read_text(encoding="utf-8")
+    assert "<h1>B. Coauthor</h1>" in coauthor and "One" in coauthor and "Two" in coauthor and "Three" not in coauthor
+    assert coauthor.index("Two") < coauthor.index("One")                                       # newest first
+    assert 'href="../../two/index.html"' in coauthor                                           # links work from two levels down
+    index = (out / "authors" / "index.html").read_text(encoding="utf-8")
+    assert "<h1>Authors</h1>" in index and "2 posts" in index and "1 post<" in index and 'href="b-coauthor/index.html"' in index
+    assert B.check_links(out) == []
+
+
+def test_the_site_author_is_the_default_author_and_gets_a_page(tmp_path):
+    out = build_out(authors_site(tmp_path, {"a.html": post()}))
+    assert (out / "authors" / "a-writer" / "index.html").exists()                              # the helper site's author is "A. Writer"
+
+
+def test_authors_names_are_escaped_and_accents_fold_into_the_address(tmp_path):
+    out = build_out(authors_site(tmp_path, {"a.html": post(authors="Zoë <b>Q</b> Writer")}))
+    page = (out / "a" / "index.html").read_text(encoding="utf-8")
+    assert "<b>Q</b>" not in page and "Zoë &lt;b&gt;Q&lt;/b&gt; Writer" in page
+    assert (out / "authors" / "zoe-b-q-b-writer" / "index.html").exists()
+
+
+def test_publishing_leaves_out_authors_who_only_have_drafts(tmp_path):
+    site = authors_site(tmp_path, {"a.html": post(), "d.html": post(title="D", authors="Ghost Writer", draft="true")})
+    out = build_out(site, publish=True)
+    assert not (out / "authors" / "ghost-writer").exists() and "Ghost" not in (out / "authors" / "index.html").read_text(encoding="utf-8")
+    assert B.check_links(out) == []
+    assert "authors/ghost-writer" not in (out / "sitemap.xml").read_text(encoding="utf-8") and "authors/a-writer/index.html" in (out / "sitemap.xml").read_text(encoding="utf-8")
+
+
+def test_author_pages_have_no_authors_row_on_static_pages_and_none_when_there_are_no_posts(tmp_path):
+    site = make_site(tmp_path, pages={"about.html": "---\ntitle: About\n---\n<p>x</p>"}, author_pages=True)
+    out = build_out(site)
+    assert "Nothing published yet." in (out / "authors" / "index.html").read_text(encoding="utf-8")
+    assert "Authors" not in (out / "about" / "index.html").read_text(encoding="utf-8").split("<main")[1]
+
+
+@pytest.mark.parametrize("posts,match", [
+    ({"a.html": post(authors="Jo Smith"), "b.html": post(authors="jo  smith")}, "would both live at authors/jo-smith"),
+    ({"a.html": post(authors="Zoë"), "b.html": post(authors="Zoe")}, "would both live at authors/zoe"),
+    ({"a.html": post(authors="张伟")}, "has no letters or digits"),
+    ({"authors.html": post()}, "'authors' is used by the author pages"),
+])
+def test_author_address_problems_are_messages(tmp_path, posts, match):
+    site = authors_site(tmp_path, posts)
+    with pytest.raises(B.BuildError, match=match):
+        B.build(site, site / "public")
+
+
+def test_author_pages_must_be_a_boolean_and_cannot_clash_with_a_section(tmp_path):
+    with pytest.raises(B.BuildError, match="'author_pages' must be true or false"):
+        B.load_site(make_site(tmp_path / "a", author_pages="yes"))
+    site = make_site(tmp_path / "b", posts={"a.html": post()}, author_pages=True, sections=[{"id": "authors", "heading": "Authors"}])
+    with pytest.raises(B.BuildError, match="cannot use the address 'authors'"):
+        B.build(site, site / "public")

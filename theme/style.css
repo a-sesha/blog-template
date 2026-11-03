@@ -86,6 +86,7 @@ mark{background:var(--butter);color:var(--on-butter);padding:0 2px}
 /* ---- post header ---------------------------------------------------------------------------------------------- */
 .meta{font-family:var(--mono);font-size:12px;line-height:1.5;display:grid;grid-template-columns:96px 1fr;row-gap:2px;margin-bottom:20px}
 .meta>span:nth-child(odd){color:var(--muted-2)}
+.meta a{color:inherit}
 .btns{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 36px}
 .btn{font-family:var(--mono);font-size:13px;color:var(--btn-ink);background:var(--btn);border:1px solid var(--btn-ink);padding:5px 10px;
   box-shadow:inset 1px 1px 0 rgba(255,255,255,.5),1px 1px 0 var(--btn-ink);cursor:pointer;text-decoration:none;display:inline-block;line-height:1.4}
@@ -168,6 +169,7 @@ ol.footnotes li:target{background:var(--butter);color:var(--on-butter)}
 ul.entries{list-style:none;padding:0;margin:0}
 .entry{display:grid;grid-template-columns:104px 1fr;column-gap:16px;padding:16px 0;border-top:1px solid var(--rule);margin:0}
 .entry:last-child{border-bottom:1px solid var(--rule)}
+.entry .count{font-family:var(--mono);font-size:12px;color:var(--muted-2);padding-top:6px}
 .entry time{font-family:var(--mono);font-size:12px;color:var(--muted-2);padding-top:6px}
 .entry a.title{font-family:var(--serif);font-size:26px;line-height:1.15;color:var(--ink);text-decoration:none;border-bottom:1px solid transparent}
 .entry a.title:hover{border-bottom-color:var(--ink)}

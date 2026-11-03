@@ -15,7 +15,6 @@ theme/. Each content file starts with a front-matter block and continues with th
     title: Three ways to imagine a forest trail
     date: 2026-10-26
     description: One sentence for the home page, search results and link previews.
-    tags: diffusion, world models
     links: Code | https://github.com/you/repo; Paper | https://arxiv.org/abs/0000.00000
     image: images/teaser.jpg
     toc: true
@@ -28,6 +27,7 @@ import datetime as dt
 import html
 import json
 import re
+import unicodedata
 import shlex
 import shutil
 import sys
@@ -112,7 +112,7 @@ def load_entry(path, kind):
         except ValueError:
             raise BuildError(f"{path}: date must be written YYYY-MM-DD, got {meta.get('date')!r}") from None
     return {"kind": kind, "slug": slug, "title": meta["title"], "date": date, "description": meta.get("description", ""),
-            "tags": [t.strip() for t in meta.get("tags", "").split(",") if t.strip()], "draft": truthy(meta.get("draft", "")),
+            "draft": truthy(meta.get("draft", "")),
             "section": meta.get("section", "").strip(), "image": meta.get("image", ""), "authors": meta.get("authors", ""), "toc": truthy(meta.get("toc", "")),
             "links": parse_links(meta.get("links", ""), path), "body": body, "source": path,
             "styles": local_files(meta.get("styles", ""), path, "styles"), "scripts": local_files(meta.get("scripts", ""), path, "scripts")}
@@ -154,6 +154,10 @@ def load_site(root=ROOT):
     site.setdefault("sections", [])
     site.setdefault("posts_slug", "posts")
     site.setdefault("dark_mode", False)
+    site.setdefault("author_pages", False)
+    for key in ("dark_mode", "author_pages"):
+        if not isinstance(site[key], bool):
+            raise BuildError(f"site.json: '{key}' must be true or false")
     site.setdefault("nav", [])
     site["url"] = site.get("url", "").rstrip("/")
     return site
@@ -489,10 +493,8 @@ def entry_main(site, e, publish, root_dir=ROOT, engine=None):
     if e["date"]:
         meta += ["Published", fmt_date(e["date"])]
     if e["kind"] == "post":
-        meta += ["Authors", esc(e["authors"] or site["author"])]
+        meta += ["Authors", authors_html(site, e)]
         meta += ["Reading time", f"{reading_minutes(body)} min"]
-    if e["tags"]:
-        meta += ["Tags", "".join(f'<span class="pill">{esc(t)}</span>' for t in e["tags"])]
     meta_html = '<div class="meta">' + "".join(f"<span>{v}</span>" for v in meta) + "</div>"
     draft = '<p><span class="pill butter">draft: not published</span></p>' if e["draft"] and not publish else ""
     links = ('<div class="btns">' + "".join(f'<a class="btn" href="{esc(u)}">{esc(l)}</a>' for l, u in e["links"]) + "</div>") if e["links"] else ""
@@ -501,6 +503,47 @@ def entry_main(site, e, publish, root_dir=ROOT, engine=None):
         toc_html = '<nav class="toc" aria-label="On this page"><b>On this page</b><ol>' + "".join(
             f'<li><a href="#{i}">{esc(t)}</a></li>' for i, t in toc) + "</ol></nav>"
     return f"{draft}<h1>{esc(e['title'])}</h1>\n{meta_html}\n{links}\n{toc_html}\n{body}"
+
+
+def author_names(site, e):
+    """The authors of a post, in the order written: its `authors:` front matter, else the site's author."""
+    return [n.strip() for n in (e["authors"] or site["author"]).split(",") if n.strip()]
+
+
+def author_slug(name):
+    """The address of an author's page: 'Zoë Q. Writer' becomes 'zoe-q-writer'."""
+    plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode()
+    return re.sub(r"[^a-z0-9]+", "-", plain.lower()).strip("-")
+
+
+def authors_html(site, e):
+    """The value of the Authors row: plain text, or a link to each author's page when site.json sets "author_pages": true."""
+    if not site["author_pages"]:
+        return esc(e["authors"] or site["author"])
+    return ", ".join(f'<a href="../authors/{author_slug(n)}/index.html">{esc(n)}</a>' for n in author_names(site, e))
+
+
+def author_index(site, posts):
+    """{address: (name, [posts, newest first])} for every author of these posts; two names that make the same address are an error."""
+    found = {}
+    for p in posts:
+        for name in author_names(site, p):
+            slug = author_slug(name)
+            if not slug:
+                raise BuildError(f"{p['source']}: the author '{name}' has no letters or digits to make an address from")
+            known, items = found.setdefault(slug, (name, []))
+            if known != name:
+                raise BuildError(f"{p['source']}: the authors '{known}' and '{name}' would both live at authors/{slug}/; write the name the same way everywhere")
+            if p not in items:
+                items.append(p)
+    return found
+
+
+def authors_main(authors):
+    rows = "".join(f'<li class="entry"><span class="count">{len(items)} post{"" if len(items) == 1 else "s"}</span><div>'
+                   f'<a class="title" href="{slug}/index.html">{esc(name)}</a></div></li>'
+                   for slug, (name, items) in sorted(authors.items(), key=lambda kv: kv[1][0].casefold()))
+    return "<h1>Authors</h1>\n" + ('<ul class="entries">' + rows + "</ul>" if rows else "<p>Nothing published yet.</p>")
 
 
 def entry_list(posts, root=""):
@@ -551,9 +594,9 @@ def section_slugs(site):
     return [site["posts_slug"]] + [s["id"] for s in site["sections"]]
 
 
-def sitemap(site, entries):
+def sitemap(site, entries, extra=()):
     base = site["url"]
-    urls = [f"{base}/index.html"] + [f'{base}/{s}/index.html' for s in section_slugs(site)] + [f'{base}/{e["slug"]}/index.html' for e in entries]
+    urls = [f"{base}/index.html"] + [f'{base}/{s}/index.html' for s in section_slugs(site)] + [f'{base}/{x}' for x in extra] + [f'{base}/{e["slug"]}/index.html' for e in entries]
     return ('<?xml version="1.0" encoding="utf-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
             + "".join(f"<url><loc>{esc(u)}</loc></url>\n" for u in urls) + "</urlset>\n")
 
@@ -595,9 +638,14 @@ def build(root=ROOT, out=None, publish=False, engine=None):
         if e["section"] and e["section"] not in known:
             raise BuildError(f"{e['source']}: section '{e['section']}' is not listed under \"sections\" in site.json (known: {sorted(known) or 'none'})")
     for e in entries:
+        if site["author_pages"] and e["slug"] == "authors":
+            raise BuildError(f"{e['source']}: the address 'authors' is used by the author pages (site.json \"author_pages\"); give the file another name or a slug")
         if e["slug"] in section_slugs(site):
             raise BuildError(f"{e['source']}: the address '{e['slug']}' is a section page (see site.json); give the file another name or a slug")
     posts = sorted((e for e in entries if e["kind"] == "post"), key=lambda e: (e["date"], e["slug"]), reverse=True)
+    if site["author_pages"] and "authors" in section_slugs(site):
+        raise BuildError("site.json: a section cannot use the address 'authors' while \"author_pages\" is on")
+    authors = author_index(site, posts) if site["author_pages"] else {}
     check_output_location(root, out)
     prepare_output(out)
     has_feed = bool(site["url"])
@@ -615,6 +663,17 @@ def build(root=ROOT, out=None, publish=False, engine=None):
         (out / slug / "index.html").write_text(page_html(
             site, template, title=heading, description=site["description"], root="../", current=slug, main=section_main(heading, items),
             canonical_path=f"{slug}/index.html", has_feed=has_feed), encoding="utf-8")
+    if site["author_pages"]:
+        (out / "authors").mkdir()
+        (out / "authors" / "index.html").write_text(page_html(
+            site, template, title="Authors", description=site["description"], root="../", current="authors", main=authors_main(authors),
+            canonical_path="authors/index.html", has_feed=has_feed), encoding="utf-8")
+        for slug, (name, items) in authors.items():
+            (out / "authors" / slug).mkdir()
+            (out / "authors" / slug / "index.html").write_text(page_html(
+                site, template, title=name, description=f"Posts by {name}", root="../../", current=f"authors/{slug}",
+                main=f"<h1>{esc(name)}</h1>\n{entry_list(items, '../../')}", canonical_path=f"authors/{slug}/index.html",
+                has_feed=has_feed), encoding="utf-8")
     for e in entries:
         folder, own = out / e["slug"], e["source"].with_suffix("")
         if own.is_dir():                                           # content/posts/NAME/ : the page's own files (media, scripts, styles)
@@ -630,7 +689,8 @@ def build(root=ROOT, out=None, publish=False, engine=None):
             styles=e["styles"], scripts=e["scripts"]), encoding="utf-8")
     if has_feed:                                                    # drafts never go into the feed or the sitemap
         (out / "feed.xml").write_text(atom_feed(site, [p for p in posts if not p["draft"]]), encoding="utf-8")
-        (out / "sitemap.xml").write_text(sitemap(site, [e for e in entries if not e["draft"]]), encoding="utf-8")
+        (out / "sitemap.xml").write_text(sitemap(site, [e for e in entries if not e["draft"]],
+                                                         ["authors/index.html"] + [f"authors/{s}/index.html" for s in authors] if site["author_pages"] else ()), encoding="utf-8")
     else:
         print("note: site.json has no 'url', so feed.xml and sitemap.xml were not written (they need absolute addresses)")
     return sorted(str(p.relative_to(out)).replace("\\", "/") for p in out.rglob("*") if p.is_file())
