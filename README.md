@@ -142,10 +142,11 @@ Built in (`theme/components/`): `callout`, `card`, `facts` + `fact`, `chips` + `
   square white cards with a 1 px border and an offset shadow; thin black arrows with an open head and the label beside the arrow;
   small rounded chips for tokens; one butter-yellow callout per figure; data in two or three muted colours that keep the same meaning
   everywhere on the page; no frame, no heavy axes, a faint grid, tiny grey tick labels, round markers with a black outline.
-- **Dark mode:** automatic, from the reader's system setting. The dark palette is the `prefers-color-scheme: dark` block under the tokens, and
-  `theme-color` in `theme/layout.html` has a dark twin; the tests check its contrast. Cards, code and tooltips use `--surface`, text on the yellow
-  highlight uses `--on-butter`. Inline figures keep their literal colours (`#fff`, `#000`, `#B4B3AF`, `#EEEDE8`) because the stylesheet maps those onto the
-  tokens; give text that sits on a butter shape `class="note"` so it stays black.
+- **Dark mode (opt-in):** set `"dark_mode": true` in `site.json` and the pages follow the reader's system setting. It is off by default because posts
+  with inline figures or styles of their own usually hard-code white and black. The dark palette is the `prefers-color-scheme: dark` block
+  under the tokens (applied to `html[data-scheme="auto"]`), and `theme-color` gets a dark twin; the tests check its contrast. Cards, code and
+  tooltips use `--surface`, text on the yellow highlight uses `--on-butter`. Inline figures keep their literal colours (`#fff`, `#000`,
+  `#B4B3AF`, `#EEEDE8`) because the stylesheet maps those onto the tokens; give text that sits on a butter shape `class="note"` so it stays black.
 - **Not included on purpose:** comments, analytics, a search box, tag pages. Add what you need; nothing depends on it.
 
 ## How it is built

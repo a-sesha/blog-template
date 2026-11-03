@@ -146,6 +146,7 @@ def load_site(root=ROOT):
     site.setdefault("footer", "")
     site.setdefault("posts_heading", "Posts")
     site.setdefault("sections", [])
+    site.setdefault("dark_mode", False)
     site.setdefault("nav", [])
     site["url"] = site.get("url", "").rstrip("/")
     return site
@@ -437,6 +438,13 @@ def nav_html(site, root, current):
     return "".join(items)
 
 
+def theme_color(site):
+    light = '<meta name="theme-color" content="#F5F4EF"'
+    if not site["dark_mode"]:
+        return light + ">"
+    return f'{light} media="(prefers-color-scheme: light)"><meta name="theme-color" content="#17160F" media="(prefers-color-scheme: dark)">'
+
+
 def footer_html(site):
     """The page footer: the site's own HTML, a default copyright line when left empty, nothing at all when "footer" is false."""
     if site["footer"] is False:
@@ -457,7 +465,7 @@ def page_html(site, template, *, title, description, root, main, current="", og_
     feed = f'<link rel="alternate" type="application/atom+xml" title="{esc(site["title"])}" href="{root}feed.xml">' if has_feed else ""
     full_title = title if title == site["title"] else f"{title} | {site['title']}"
     return render(template, {
-        "lang": esc(site["lang"]), "title": esc(full_title), "description": esc(description or site["description"]),
+        "lang": esc(site["lang"]), "scheme_attr": ' data-scheme="auto"' if site["dark_mode"] else "", "theme_color": theme_color(site), "title": esc(full_title), "description": esc(description or site["description"]),
         "og_type": og_type, "og_title": esc(title), "og_extra": og_extra, "canonical": canonical, "feed_link": feed,
         "twitter_card": "summary_large_image" if image else "summary", "root": root,
         "brand": esc(site["title"]), "nav": nav_html(site, root, current), "main": main,

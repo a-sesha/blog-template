@@ -27,8 +27,9 @@
   --text-width:768px; --wide-extra:116px;      /* text column; figures may break out by this much on each side */
   color-scheme:light;
 }
-/* Dark scheme: the same tokens, inked on dark paper. Follows the reader's system setting; the tests check its contrast too. */
-@media (prefers-color-scheme:dark){:root{
+/* Dark scheme: the same tokens, inked on dark paper. Off unless site.json sets "dark_mode": true (the page then carries data-scheme="auto"
+   and follows the reader's system setting); posts with hard-coded colours of their own stay readable that way. The tests check its contrast. */
+@media (prefers-color-scheme:dark){:root[data-scheme="auto"]{
   --paper:#17160F; --ink:#EEEBDF; --muted:#6F6B54; --muted-2:#A9A596; --rule:#45433A;
   --btn:#34332B; --btn-ink:#DAD8CC; --btn-hover:#403F36;
   --forest:#7DB07E; --teal:#2A4547; --sage:#3A4426; --greige:#2A2922;

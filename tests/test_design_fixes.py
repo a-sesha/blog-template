@@ -11,7 +11,7 @@ CSS = (ROOT / "theme" / "style.css").read_text(encoding="utf-8")
 
 
 def dark_tokens():
-    block = re.search(r"@media \(prefers-color-scheme:dark\)\{:root\{(.*?)\}\}", CSS, re.S).group(1)
+    block = re.search(r"@media \(prefers-color-scheme:dark\)\{:root\[data-scheme=\"auto\"\]\{(.*?)\}\}", CSS, re.S).group(1)
     return dict(re.findall(r"--([\w-]+):\s*(#[0-9A-Fa-f]{6})", block))
 
 
@@ -71,10 +71,15 @@ def test_inline_figures_follow_the_tokens():
     assert '[fill="#fff"]{fill:var(--surface)}' in CSS and '[stroke="#000"]{stroke:var(--ink)}' in CSS and "text.note" in CSS
 
 
-def test_theme_color_is_set_for_both_schemes(tmp_path):
-    site = make_site(tmp_path, posts={"a.html": post()})
-    B.build(site, site / "public")
-    page = (site / "public" / "index.html").read_text(encoding="utf-8")
+def test_dark_mode_is_off_unless_the_site_opts_in(tmp_path):
+    page = build_home(tmp_path)
+    assert "data-scheme" not in page and "prefers-color-scheme: dark" not in page
+    assert page.count('name="theme-color"') == 1 and 'content="#F5F4EF"' in page
+
+
+def test_theme_color_is_set_for_both_schemes_when_dark_mode_is_on(tmp_path):
+    page = build_home(tmp_path, dark_mode=True)
+    assert '<html lang="en" data-scheme="auto">' in page
     assert re.search(r'name="theme-color" content="#F5F4EF" media="\(prefers-color-scheme: light\)"', page)
     assert re.search(rf'name="theme-color" content="{dark_tokens()["paper"]}" media="\(prefers-color-scheme: dark\)"', page)
 
