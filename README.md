@@ -148,7 +148,11 @@ and never cause sideways scrolling; on a phone every slot collapses to the scree
 small sites and check, among other things: relative paths at every depth, no broken links, escaping of titles and descriptions,
 drafts left out of the feed, draft notes absent from the published source, unique ids, a valid feed and sitemap, and text contrast.
 
+## Versions
+
+Releases are git tags (`v0.1.0`, ...). A site that builds in CI should name a tag rather than follow `main`, and move to a newer
+one only after a `--publish --check` build looks right.
+
 ## Licence
 
-Code and theme: no licence has been chosen yet, so by default nobody else may reuse them; add a `LICENSE` file (for example MIT) to
-allow it. Fonts: SIL Open Font License 1.1, with the licence texts in `theme/fonts/`.
+Code and theme: MIT, see `LICENSE`. Fonts: SIL Open Font License 1.1, with the licence texts in `theme/fonts/`.
