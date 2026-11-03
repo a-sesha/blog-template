@@ -233,6 +233,14 @@ footer.credit a{color:inherit}
 .cw-cn{font-family:var(--mono);font-size:12px;color:var(--muted-2);min-width:1.8em;text-align:right;padding-top:1px}
 .cw-cross{background:var(--greige)}
 .cw-active{background:var(--teal);border-left-color:var(--ink)}
+.cw-stamp{display:none;margin-left:auto;font-family:var(--mono);font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;background:var(--butter);color:var(--on-butter);border:2px solid var(--on-butter);box-shadow:2px 2px 0 var(--on-butter);padding:3px 10px;transform:rotate(-4deg)}
+.cw-solved .cw-stamp{display:inline-block;animation:cw-pop .4s cubic-bezier(.3,1.6,.5,1) both}
+.cw-solved .cw-banner{background:var(--sage);color:var(--ink);border-color:var(--ink)}
+.cw-timer:disabled{opacity:.7;cursor:default}
+@keyframes cw-flash{0%{fill:var(--surface)}35%{fill:var(--butter)}100%{fill:var(--surface)}}
+@keyframes cw-pop{from{transform:rotate(-4deg) scale(.4);opacity:0}to{transform:rotate(-4deg) scale(1);opacity:1}}
+.cw-wave .cw-c:not(.cw-block) .cw-sq{animation:cw-flash .75s ease var(--d) 1 both}
+@media (prefers-reduced-motion:reduce){.cw-wave .cw-c:not(.cw-block) .cw-sq,.cw-solved .cw-stamp{animation:none}}
 .cw-status{font-family:var(--mono);font-size:13px;margin:12px 0 0;min-height:1.5em}
 .crossword noscript p{font-size:14px}
 .crossword noscript ol{font-size:14px}

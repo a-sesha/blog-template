@@ -116,6 +116,9 @@
     var clear = el('button', 'btn', 'Clear');
     clear.type = 'button';
     bar.appendChild(clear);
+    var stamp = el('span', 'cw-stamp', 'Solved');
+    stamp.setAttribute('aria-hidden', 'true');
+    bar.appendChild(stamp);
 
     var main = el('div', 'cw-main'), board = el('div', 'cw-board');
     var banner = el('div', 'cw-banner'), bannerNum = el('b'), bannerText = el('span');
@@ -128,6 +131,7 @@
       for (c = 0; c < W; c++) {
         var g = svg('g', { 'class': 'cw-c' });
         var x = c * CELL, y = r * CELL;
+        g.style.setProperty('--d', (r + c) * 60 + 'ms');
         g.appendChild(svg('rect', { x: x, y: y, width: CELL, height: CELL, 'class': 'cw-sq' }));
         if (isBlock(r, c)) { g.setAttribute('class', 'cw-c cw-block'); grid.appendChild(g); cellEls.push(g); continue; }
         if ((data.circles || []).some(function (p) { return p[0] === r && p[1] === c; })) g.appendChild(svg('circle', { cx: x + CELL / 2, cy: y + CELL / 2, r: CELL / 2 - 1.5, 'class': 'cw-circle' }));
@@ -296,14 +300,32 @@
       if (!window.confirm('Clear the whole grid and reset the timer?')) return;
       for (var i = 0; i < W * H; i++) { letters[i] = ''; flags[i] = ''; }
       elapsed = 0; done = false; started = false; setRunning(false); setPaused(false); showTime(); announce('Grid cleared.');
-      paint(); save();
+      timerBtn.disabled = false; root.classList.remove('cw-solved', 'cw-wave');
+      selectWord(words[0]); save();                                 // back to 1 Across
     });
     function announce(msg) { status.textContent = msg; }
+    function helpedCount() { return flags.filter(function (f) { return f === 'rev'; }).length; }
+    function solvedMessage() {
+      var helped = helpedCount();
+      return 'Solved in ' + clock(elapsed) + (helped ? ', with ' + helped + (helped === 1 ? ' square' : ' squares') + ' revealed.' : '.');
+    }
+    var waveTimer = null;
+    function finish(celebrate) {                                   // a small flourish for a clean solve: a wave across the grid and a stamp
+      timerBtn.disabled = true;
+      root.classList.toggle('cw-solved', helpedCount() === 0);
+      if (celebrate && helpedCount() === 0) {
+        root.classList.remove('cw-wave');
+        void root.offsetWidth;                                     // restart the animation if it ran before
+        root.classList.add('cw-wave');
+        clearTimeout(waveTimer);
+        waveTimer = setTimeout(function () { root.classList.remove('cw-wave'); }, 1800);
+      }
+    }
     function afterEdit() {
       if (!done && solved()) {
         done = true; setRunning(false);
-        var helped = flags.filter(function (f) { return f === 'rev'; }).length;
-        announce('Solved in ' + clock(elapsed) + (helped ? ', with ' + helped + (helped === 1 ? ' square' : ' squares') + ' revealed.' : '.'));
+        announce(solvedMessage());
+        finish(true);
       }
       paint(); save();
     }
@@ -323,7 +345,7 @@
           var i = idx(rr, cc), g = cellEls[i];
           if (isBlock(rr, cc)) continue;
           var cls = 'cw-c';
-          if (rr === cur.r && cc === cur.c) cls += ' cw-cur'; else if (inWord[i]) cls += ' cw-word';
+          if (!done) { if (rr === cur.r && cc === cur.c) cls += ' cw-cur'; else if (inWord[i]) cls += ' cw-word'; }
           if (flags[i] === 'bad') cls += ' cw-bad';
           if (flags[i] === 'rev') cls += ' cw-rev';
           g.setAttribute('class', cls);
@@ -331,6 +353,7 @@
         }
       }
       var label = w.n + (w.dir === 'across' ? 'A' : 'D'), text = ' ' + (w.clue || '');
+      if (done) { label = helpedCount() ? 'Filled in' : 'Solved'; text = ' in ' + clock(elapsed); }
       if (bannerNum.textContent !== label) bannerNum.textContent = label;         // only when the clue changes, so screen readers hear it once
       if (bannerText.textContent !== text) bannerText.textContent = text;
       var crossWord = wordAt[w.dir === 'across' ? 'down' : 'across'][idx(cur.r, cur.c)];
@@ -372,7 +395,7 @@
     cur.r = first.cells[0][0]; cur.c = first.cells[0][1]; cur.dir = first.dir;
     playIcon.className = 'cw-icon cw-play';
     timerBtn.setAttribute('aria-label', started && !done ? 'Resume the timer, ' + clock(elapsed) : 'Start the timer');
-    if (done) announce('Solved in ' + clock(elapsed) + '.');
+    if (done) { announce(solvedMessage()); finish(false); }
     paint();
   }
 

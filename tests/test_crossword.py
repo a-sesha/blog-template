@@ -198,3 +198,10 @@ def test_the_player_script_and_styles_exist_and_agree_on_the_class_names():
 def test_the_player_never_writes_data_as_html():
     js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
     assert "innerHTML" not in js and "eval(" not in js and "document.write" not in js
+
+
+def test_the_finishing_flourish_is_switched_off_for_readers_who_ask_for_less_motion_and_only_follows_a_clean_solve():
+    css = (ROOT / "theme" / "style.css").read_text(encoding="utf-8")
+    assert re.search(r"@media \(prefers-reduced-motion:reduce\)\{[^}]*\.cw-wave[^}]*animation:none", css)
+    js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
+    assert "helpedCount() === 0" in js and "cw-solved" in js and "cw-wave" in js                  # no celebration when squares were revealed
