@@ -109,3 +109,33 @@ def test_footer_default_custom_and_off(tmp_path):
 def test_the_home_heading_over_the_post_list_is_configurable_and_escaped(tmp_path):
     assert '<h2 id="posts">Posts</h2>' in build_home(tmp_path / "a")
     assert '<h2 id="posts">Musings &amp; notes</h2>' in build_home(tmp_path / "b", posts_heading="Musings & notes")
+
+
+# ---- extra home-page sections ---------------------------------------------------------------------------------------------------------
+SECTIONS = [{"id": "crosswords", "heading": "Crosswords"}]
+
+
+def test_the_home_page_lists_each_section_under_its_own_heading(tmp_path):
+    site = make_site(tmp_path, posts={"m.html": post(title="A musing"), "x.html": post(title="A grid", section="crosswords")}, sections=SECTIONS,
+                     posts_heading="Musings")
+    B.build(site, site / "public")
+    home = (site / "public" / "index.html").read_text(encoding="utf-8")
+    musings, crosswords = home.split('<h2 id="crosswords">')
+    assert '<h2 id="posts">Musings</h2>' in musings and "A musing" in musings and "A grid" not in musings
+    assert "Crosswords</h2>" in crosswords and "A grid" in crosswords and "A musing" not in crosswords
+
+
+def test_an_empty_section_says_so_and_a_draft_section_entry_is_left_out_when_publishing(tmp_path):
+    site = make_site(tmp_path, posts={"x.html": post(title="Secret", section="crosswords", draft="true")}, sections=SECTIONS)
+    B.build(site, site / "public", publish=True)
+    home = (site / "public" / "index.html").read_text(encoding="utf-8")
+    assert home.count("Nothing published yet.") == 2 and "Secret" not in home
+
+
+def test_an_unknown_or_badly_declared_section_is_a_message(tmp_path):
+    site = make_site(tmp_path / "a", posts={"x.html": post(section="nope")}, sections=SECTIONS)
+    with pytest.raises(B.BuildError, match="section 'nope' is not listed"):
+        B.build(site, site / "public")
+    for bad in ([{"id": "posts", "heading": "X"}], [{"id": "A b", "heading": "X"}], [{"id": "a"}], SECTIONS + SECTIONS):
+        with pytest.raises(B.BuildError, match="section"):
+            B.load_site(make_site(tmp_path / f"b{len(str(bad))}", sections=bad))

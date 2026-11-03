@@ -111,7 +111,7 @@ def load_entry(path, kind):
             raise BuildError(f"{path}: date must be written YYYY-MM-DD, got {meta.get('date')!r}") from None
     return {"kind": kind, "slug": slug, "title": meta["title"], "date": date, "description": meta.get("description", ""),
             "tags": [t.strip() for t in meta.get("tags", "").split(",") if t.strip()], "draft": truthy(meta.get("draft", "")),
-            "image": meta.get("image", ""), "authors": meta.get("authors", ""), "toc": truthy(meta.get("toc", "")),
+            "section": meta.get("section", "").strip(), "image": meta.get("image", ""), "authors": meta.get("authors", ""), "toc": truthy(meta.get("toc", "")),
             "links": parse_links(meta.get("links", ""), path), "body": body, "source": path,
             "styles": local_files(meta.get("styles", ""), path, "styles"), "scripts": local_files(meta.get("scripts", ""), path, "scripts")}
 
@@ -131,6 +131,13 @@ def load_site(root=ROOT):
     for i, item in enumerate(site.get("nav", [])):
         if not (isinstance(item, dict) and isinstance(item.get("label"), str) and isinstance(item.get("href"), str)):
             raise BuildError(f"site.json: nav item {i + 1} must look like {{\"label\": \"About\", \"href\": \"about/index.html\"}}")
+    for i, sec in enumerate(site.get("sections", [])):
+        if not (isinstance(sec, dict) and isinstance(sec.get("id"), str) and SLUG.match(sec["id"]) and sec["id"] != "posts"
+                and isinstance(sec.get("heading"), str)):
+            raise BuildError(f"site.json: section {i + 1} must look like {{\"id\": \"crosswords\", \"heading\": \"Crosswords\"}} "
+                             "(a lower-case id other than 'posts')")
+    if len({s["id"] for s in site.get("sections", [])}) != len(site.get("sections", [])):
+        raise BuildError("site.json: section ids must be unique")
     if site.get("url") and not re.match(r"https?://[^/\s]+", site["url"]):
         raise BuildError("site.json: 'url' must start with https:// (or http://), for example https://you.example")
     site.setdefault("lang", "en")
@@ -138,6 +145,7 @@ def load_site(root=ROOT):
     site.setdefault("intro", "")
     site.setdefault("footer", "")
     site.setdefault("posts_heading", "Posts")
+    site.setdefault("sections", [])
     site.setdefault("nav", [])
     site["url"] = site.get("url", "").rstrip("/")
     return site
@@ -480,15 +488,23 @@ def entry_main(site, e, publish, root_dir=ROOT, engine=None):
     return f"{draft}<h1>{esc(e['title'])}</h1>\n{meta_html}\n{links}\n{toc_html}\n{body}"
 
 
-def home_main(site, posts, publish, root_dir=ROOT, engine=None):
+def entry_list(posts):
     items = []
     for p in posts:
         badge = ' <span class="pill butter">draft</span>' if p["draft"] else ""
         desc = f"<p>{esc(p['description'])}</p>" if p["description"] else ""
         items.append(f'<li class="entry"><time datetime="{p["date"].isoformat()}">{fmt_date(p["date"])}</time><div>'
                      f'<a class="title" href="{p["slug"]}/index.html">{esc(p["title"])}</a>{badge}{desc}</div></li>')
-    listing = '<ul class="entries">' + "".join(items) + "</ul>" if items else "<p>Nothing published yet.</p>"
-    return f'<h1>{esc(site["title"])}</h1>\n<div class="lede">{expand_shortcodes(site["intro"], Ctx(root_dir, "", "site.json (intro)", engine))}</div>\n<h2 id="posts">{esc(site["posts_heading"])}</h2>\n{listing}'
+    return '<ul class="entries">' + "".join(items) + "</ul>" if items else "<p>Nothing published yet.</p>"
+
+
+def home_main(site, posts, publish, root_dir=ROOT, engine=None):
+    """The intro, then the main list under `posts_heading`, then one list per extra section (posts with `section: id` in their front matter)."""
+    intro = expand_shortcodes(site["intro"], Ctx(root_dir, "", "site.json (intro)", engine))
+    lists = [("posts", site["posts_heading"], [p for p in posts if not p["section"]])]
+    lists += [(s["id"], s["heading"], [p for p in posts if p["section"] == s["id"]]) for s in site["sections"]]
+    parts = "\n".join(f'<h2 id="{sid}">{esc(heading)}</h2>\n{entry_list(items)}' for sid, heading, items in lists)
+    return f'<h1>{esc(site["title"])}</h1>\n<div class="lede">{intro}</div>\n{parts}'
 
 
 def atom_feed(site, posts):
@@ -545,6 +561,10 @@ def build(root=ROOT, out=None, publish=False, engine=None):
     site = load_site(root)
     template = (layout if layout.exists() else engine / "theme" / "layout.html").read_text(encoding="utf-8")
     entries = [e for e in load_entries(root) if not (publish and e["draft"])]
+    known = {s["id"] for s in site["sections"]}
+    for e in entries:
+        if e["section"] and e["section"] not in known:
+            raise BuildError(f"{e['source']}: section '{e['section']}' is not listed under \"sections\" in site.json (known: {sorted(known) or 'none'})")
     posts = sorted((e for e in entries if e["kind"] == "post"), key=lambda e: (e["date"], e["slug"]), reverse=True)
     check_output_location(root, out)
     prepare_output(out)

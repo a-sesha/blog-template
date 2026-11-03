@@ -26,6 +26,10 @@ python -m pytest tests     # the test suite (needs pytest)
 4. Upload the contents of `public/` to any static host (GitHub Pages, Netlify, Cloudflare Pages, a plain web server).
 
 The heading above the post list on the home page is `"posts_heading"` in `site.json` (default "Posts"; the address stays `#posts`).
+Extra home-page lists: declare them in `site.json`, e.g. `"sections": [{"id": "crosswords", "heading": "Crosswords"}]`, and give a post
+`section: crosswords`. Posts without a `section` stay under `posts_heading`. Each list has its own address (`index.html#crosswords`) to use in `nav`;
+an unknown section name stops the build.
+
 The footer is the `footer` HTML in `site.json`; leave it empty for a copyright line, or set `"footer": false` for none. The fonts' licence texts
 ship in `theme/fonts/`; no credit line is added to the pages.
 
@@ -45,6 +49,7 @@ draft: true                  # shown with a badge locally, left out by --publish
 styles: post.css             # files in the post's own folder (see below), linked after the theme
 scripts: figures.js, data.js # the same, loaded at the end of the page in this order
 slug: other-address          # optional; default is the file name
+section: crosswords          # optional; list it under that extra heading on the home page (declared in site.json)
 ---
 ```
 
