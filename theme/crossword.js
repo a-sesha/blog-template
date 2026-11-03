@@ -307,8 +307,16 @@
       scopeCells(scope).forEach(function (p) { setLetter(p[0], p[1], sol[p[0]].charAt(p[1]), 'rev'); });
       afterEdit();
     }
+    var clearTimer = null;
+    function resetClear() { clearTimeout(clearTimer); clearTimer = null; clear.textContent = 'Clear'; }
     clear.addEventListener('click', function () {
-      if (!window.confirm('Clear the whole grid and reset the timer?')) return;
+      if (!clearTimer && (started || letters.some(Boolean))) {      // two steps instead of a pop-up: press again within a few seconds to confirm (6 s)
+        clear.textContent = 'Sure? Clear';
+        clearTimer = setTimeout(resetClear, 6000);
+        announce('Press Clear again to empty the grid.');
+        return;
+      }
+      resetClear();
       for (var i = 0; i < W * H; i++) { letters[i] = ''; flags[i] = ''; }
       elapsed = 0; done = false; started = false; setRunning(false); setPaused(false); showTime(); announce('Grid cleared.');
       timerBtn.disabled = false; root.classList.remove('cw-solved', 'cw-wave');

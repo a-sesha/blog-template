@@ -211,3 +211,8 @@ def test_open_menus_close_on_an_outside_click_escape_tab_away_and_when_the_other
     js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
     assert "document.addEventListener('click'" in js and "m.contains(e.target)" in js
     assert "e.key === 'Escape') closeMenus" in js and "addEventListener('focusout'" in js and "addEventListener('toggle'" in js
+
+
+def test_clear_asks_again_on_the_button_instead_of_a_browser_pop_up_that_some_browsers_swallow():
+    js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
+    assert "confirm(" not in js and "alert(" not in js and "Sure? Clear" in js
