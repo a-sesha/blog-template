@@ -86,7 +86,7 @@ def test_theme_color_is_set_for_both_schemes_when_dark_mode_is_on(tmp_path):
 
 # ---- tap targets and cards ----------------------------------------------------------------------------------------------------------
 def test_nav_links_are_at_least_44px_tall_and_the_project_cards_use_readable_type():
-    nav = re.search(r"\nnav a\{([^}]*)\}", CSS).group(1)
+    nav = re.search(r"\nheader\.site nav a\{([^}]*)\}", CSS).group(1)
     assert "min-height:44px" in nav and "padding:0 8px" in nav
     chip = re.search(r"\n\.chip\{([^}]*)\}", CSS).group(1)
     assert int(re.search(r"font-size:(\d+)px", chip).group(1)) >= 12
@@ -144,3 +144,8 @@ def test_an_unknown_or_badly_declared_section_is_a_message(tmp_path):
     for bad in ([{"id": "posts", "heading": "X"}], [{"id": "A b", "heading": "X"}], [{"id": "a"}], SECTIONS + SECTIONS):
         with pytest.raises(B.BuildError, match="section"):
             B.load_site(make_site(tmp_path / f"b{len(str(bad))}", sections=bad))
+
+
+def test_bare_nav_rules_do_not_exist_so_the_contents_box_is_not_reshaped():
+    """A post's "On this page" box is a <nav> too; the header's tap-target styling must stay scoped to header.site."""
+    assert not re.search(r"(?m)^nav", CSS)
