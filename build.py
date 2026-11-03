@@ -136,8 +136,12 @@ def load_site(root=ROOT):
                 and isinstance(sec.get("heading"), str)):
             raise BuildError(f"site.json: section {i + 1} must look like {{\"id\": \"crosswords\", \"heading\": \"Crosswords\"}} "
                              "(a lower-case id other than 'posts')")
-    if len({s["id"] for s in site.get("sections", [])}) != len(site.get("sections", [])):
-        raise BuildError("site.json: section ids must be unique")
+    slugs = [site.get("posts_slug", "posts")] + [s["id"] for s in site.get("sections", [])]
+    if len(set(slugs)) != len(slugs):
+        raise BuildError("site.json: section ids, and posts_slug, must be unique")
+    for slug in slugs:
+        if not SLUG.match(slug) or slug in RESERVED:
+            raise BuildError(f"site.json: '{slug}' is not a usable section address; use lower-case letters, digits and '-' (reserved: {sorted(RESERVED)})")
     if site.get("url") and not re.match(r"https?://[^/\s]+", site["url"]):
         raise BuildError("site.json: 'url' must start with https:// (or http://), for example https://you.example")
     site.setdefault("lang", "en")
@@ -146,6 +150,7 @@ def load_site(root=ROOT):
     site.setdefault("footer", "")
     site.setdefault("posts_heading", "Posts")
     site.setdefault("sections", [])
+    site.setdefault("posts_slug", "posts")
     site.setdefault("dark_mode", False)
     site.setdefault("nav", [])
     site["url"] = site.get("url", "").rstrip("/")
@@ -496,23 +501,33 @@ def entry_main(site, e, publish, root_dir=ROOT, engine=None):
     return f"{draft}<h1>{esc(e['title'])}</h1>\n{meta_html}\n{links}\n{toc_html}\n{body}"
 
 
-def entry_list(posts):
+def entry_list(posts, root=""):
     items = []
     for p in posts:
         badge = ' <span class="pill butter">draft</span>' if p["draft"] else ""
         desc = f"<p>{esc(p['description'])}</p>" if p["description"] else ""
         items.append(f'<li class="entry"><time datetime="{p["date"].isoformat()}">{fmt_date(p["date"])}</time><div>'
-                     f'<a class="title" href="{p["slug"]}/index.html">{esc(p["title"])}</a>{badge}{desc}</div></li>')
+                     f'<a class="title" href="{root}{p["slug"]}/index.html">{esc(p["title"])}</a>{badge}{desc}</div></li>')
     return '<ul class="entries">' + "".join(items) + "</ul>" if items else "<p>Nothing published yet.</p>"
 
 
+def section_lists(site, posts):
+    """[(page address, anchor on the home page, heading, entries)]: the main list first, then each extra section."""
+    lists = [(site["posts_slug"], "posts", site["posts_heading"], [p for p in posts if not p["section"]])]
+    lists += [(s["id"], s["id"], s["heading"], [p for p in posts if p["section"] == s["id"]]) for s in site["sections"]]
+    return lists
+
+
 def home_main(site, posts, publish, root_dir=ROOT, engine=None):
-    """The intro, then the main list under `posts_heading`, then one list per extra section (posts with `section: id` in their front matter)."""
+    """The overview: the intro, then every list (the main one under `posts_heading`, then one per extra section)."""
     intro = expand_shortcodes(site["intro"], Ctx(root_dir, "", "site.json (intro)", engine))
-    lists = [("posts", site["posts_heading"], [p for p in posts if not p["section"]])]
-    lists += [(s["id"], s["heading"], [p for p in posts if p["section"] == s["id"]]) for s in site["sections"]]
-    parts = "\n".join(f'<h2 id="{sid}">{esc(heading)}</h2>\n{entry_list(items)}' for sid, heading, items in lists)
+    parts = "\n".join(f'<h2 id="{anchor}">{esc(heading)}</h2>\n{entry_list(items)}' for _, anchor, heading, items in section_lists(site, posts))
     return f'<h1>{esc(site["title"])}</h1>\n<div class="lede">{intro}</div>\n{parts}'
+
+
+def section_main(heading, items):
+    """A page that shows only one section's entries."""
+    return f"<h1>{esc(heading)}</h1>\n{entry_list(items, '../')}"
 
 
 def atom_feed(site, posts):
@@ -530,9 +545,13 @@ def atom_feed(site, posts):
     return "\n".join(out) + "\n"
 
 
+def section_slugs(site):
+    return [site["posts_slug"]] + [s["id"] for s in site["sections"]]
+
+
 def sitemap(site, entries):
     base = site["url"]
-    urls = [f"{base}/index.html"] + [f'{base}/{e["slug"]}/index.html' for e in entries]
+    urls = [f"{base}/index.html"] + [f'{base}/{s}/index.html' for s in section_slugs(site)] + [f'{base}/{e["slug"]}/index.html' for e in entries]
     return ('<?xml version="1.0" encoding="utf-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
             + "".join(f"<url><loc>{esc(u)}</loc></url>\n" for u in urls) + "</urlset>\n")
 
@@ -573,6 +592,9 @@ def build(root=ROOT, out=None, publish=False, engine=None):
     for e in entries:
         if e["section"] and e["section"] not in known:
             raise BuildError(f"{e['source']}: section '{e['section']}' is not listed under \"sections\" in site.json (known: {sorted(known) or 'none'})")
+    for e in entries:
+        if e["slug"] in section_slugs(site):
+            raise BuildError(f"{e['source']}: the address '{e['slug']}' is a section page (see site.json); give the file another name or a slug")
     posts = sorted((e for e in entries if e["kind"] == "post"), key=lambda e: (e["date"], e["slug"]), reverse=True)
     check_output_location(root, out)
     prepare_output(out)
@@ -586,6 +608,11 @@ def build(root=ROOT, out=None, publish=False, engine=None):
     (out / "index.html").write_text(page_html(
         site, template, title=site["title"], description=site["description"], root="", current="index.html",
         main=home_main(site, posts, publish, root, engine), canonical_path="index.html", has_feed=has_feed), encoding="utf-8")
+    for slug, _, heading, items in section_lists(site, posts):
+        (out / slug).mkdir()
+        (out / slug / "index.html").write_text(page_html(
+            site, template, title=heading, description=site["description"], root="../", current=slug, main=section_main(heading, items),
+            canonical_path=f"{slug}/index.html", has_feed=has_feed), encoding="utf-8")
     for e in entries:
         folder, own = out / e["slug"], e["source"].with_suffix("")
         if own.is_dir():                                           # content/posts/NAME/ : the page's own files (media, scripts, styles)

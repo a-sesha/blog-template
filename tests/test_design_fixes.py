@@ -149,3 +149,49 @@ def test_an_unknown_or_badly_declared_section_is_a_message(tmp_path):
 def test_bare_nav_rules_do_not_exist_so_the_contents_box_is_not_reshaped():
     """A post's "On this page" box is a <nav> too; the header's tap-target styling must stay scoped to header.site."""
     assert not re.search(r"(?m)^nav", CSS)
+
+
+# ---- one page per section -------------------------------------------------------------------------------------------------------------
+def build_sections(tmp, **over):
+    site = make_site(tmp, posts={"m.html": post(title="A musing"), "x.html": post(title="A grid", section="crosswords")}, sections=SECTIONS,
+                     pages={"about.html": "---\ntitle: About\n---\n<p>x</p>"},
+                     posts_heading="Musings", posts_slug="musings", **over)
+    B.build(site, site / "public")
+    return site / "public"
+
+
+def test_each_section_has_a_page_showing_only_its_own_entries(tmp_path):
+    out = build_sections(tmp_path)
+    musings = (out / "musings" / "index.html").read_text(encoding="utf-8")
+    crosswords = (out / "crosswords" / "index.html").read_text(encoding="utf-8")
+    assert "<h1>Musings</h1>" in musings and "A musing" in musings and "A grid" not in musings
+    assert "<h1>Crosswords</h1>" in crosswords and "A grid" in crosswords and "A musing" not in crosswords
+    assert 'href="../m/index.html"' in musings and 'href="../x/index.html"' in crosswords          # links work from the section page
+    assert B.check_links(out) == []
+
+
+def test_the_home_page_stays_an_overview_of_every_section(tmp_path):
+    home = (build_sections(tmp_path) / "index.html").read_text(encoding="utf-8")
+    assert "A musing" in home and "A grid" in home
+
+
+def test_the_nav_marks_the_section_page_you_are_on(tmp_path):
+    out = build_sections(tmp_path, nav=[{"label": "Musings", "href": "musings/index.html"}, {"label": "Crosswords", "href": "crosswords/index.html"}])
+    page = (out / "crosswords" / "index.html").read_text(encoding="utf-8")
+    assert re.search(r'<a href="../crosswords/index.html" aria-current="page">Crosswords</a>', page)
+    assert 'aria-current="page">Musings' not in page
+
+
+def test_section_pages_are_in_the_sitemap_and_default_to_posts(tmp_path):
+    out = build_sections(tmp_path)
+    sm = (out / "sitemap.xml").read_text(encoding="utf-8")
+    assert "/musings/index.html" in sm and "/crosswords/index.html" in sm
+    site = make_site(tmp_path / "d", posts={"m.html": post()})
+    B.build(site, site / "public")
+    assert (site / "public" / "posts" / "index.html").exists()
+
+
+def test_a_post_cannot_take_a_section_address(tmp_path):
+    site = make_site(tmp_path, posts={"crosswords.html": post()}, sections=SECTIONS)
+    with pytest.raises(B.BuildError, match="is a section page"):
+        B.build(site, site / "public")

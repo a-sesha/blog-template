@@ -27,8 +27,9 @@ python -m pytest tests     # the test suite (needs pytest)
 
 The heading above the post list on the home page is `"posts_heading"` in `site.json` (default "Posts"; the address stays `#posts`).
 Extra home-page lists: declare them in `site.json`, e.g. `"sections": [{"id": "crosswords", "heading": "Crosswords"}]`, and give a post
-`section: crosswords`. Posts without a `section` stay under `posts_heading`. Each list has its own address (`index.html#crosswords`) to use in `nav`;
-an unknown section name stops the build.
+`section: crosswords`. Posts without a `section` stay under `posts_heading`. The home page is the overview, with every list; each list also gets a page of its own that
+shows only its entries: `crosswords/index.html` for a section (its `id`), and `posts/index.html` for the main list, or whatever `"posts_slug"` says
+(`"posts_slug": "musings"`). Point `nav` at those. An unknown section name, or a section address that a post or page already uses, stops the build.
 
 The footer is the `footer` HTML in `site.json`; leave it empty for a copyright line, or set `"footer": false` for none. The fonts' licence texts
 ship in `theme/fonts/`; no credit line is added to the pages.
