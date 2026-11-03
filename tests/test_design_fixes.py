@@ -195,3 +195,27 @@ def test_a_post_cannot_take_a_section_address(tmp_path):
     site = make_site(tmp_path, posts={"crosswords.html": post()}, sections=SECTIONS)
     with pytest.raises(B.BuildError, match="is a section page"):
         B.build(site, site / "public")
+
+
+# ---- links that are not filled in yet ------------------------------------------------------------------------------------------------
+def post_page(tmp, links):
+    site = make_site(tmp, posts={"a.html": post(links=links)})
+    B.build(site, site / "public")
+    return (site / "public" / "a" / "index.html").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("links", ["Code | #", "Code |", "Code |  ;", "Code | #; Paper | #"])
+def test_a_link_that_is_not_filled_in_is_hidden_and_so_is_an_empty_button_row(tmp_path, links):
+    page = post_page(tmp_path, links)
+    assert ">Code<" not in page and ">Paper<" not in page and 'class="btns"' not in page
+
+
+def test_only_the_filled_in_links_are_shown(tmp_path):
+    page = post_page(tmp_path, "Code | #; Paper | https://example.org/p")
+    assert ">Code<" not in page and '<a class="btn" href="https://example.org/p">Paper</a>' in page
+
+
+@pytest.mark.parametrize("links", ["Code", "| https://example.org", "Code https://example.org"])
+def test_a_malformed_link_is_still_a_message(links):
+    with pytest.raises(B.BuildError, match="links must look like"):
+        B.parse_links(links, "f")

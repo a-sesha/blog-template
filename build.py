@@ -73,8 +73,10 @@ def parse_links(value, where):
     links = []
     for part in filter(None, (p.strip() for p in value.split(";"))):
         label, sep, url = part.partition("|")
-        if not sep or not label.strip() or not url.strip():
+        if not sep or not label.strip():
             raise BuildError(f"{where}: links must look like 'Label | https://...; Label | https://...'")
+        if url.strip() in ("", "#"):
+            continue                                     # not filled in yet ("Code |" or "Code | #"): the button stays hidden
         links.append((label.strip(), safe_url(url.strip(), where)))
     return links
 

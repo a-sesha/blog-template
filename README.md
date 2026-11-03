@@ -43,7 +43,7 @@ date: 2026-10-26             # required for posts, YYYY-MM-DD; the home page and
 description: One sentence for the home page, search results and link previews.
 tags: one, two
 authors: A. Writer, B. Coauthor     # default: author in site.json
-links: Code | https://github.com/you/repo; Paper | https://arxiv.org/abs/0000.00000
+links: Code | https://github.com/you/repo; Paper | https://arxiv.org/abs/0000.00000   # a link left blank (`Code |` or `Code | #`) is not shown
 image: images/teaser.jpg     # link-preview image, a file in content/images/
 toc: true                    # table of contents from the h2 headings
 draft: true                  # shown with a badge locally, left out by --publish
