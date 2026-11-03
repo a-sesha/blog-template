@@ -24,6 +24,7 @@ theme/. Each content file starts with a front-matter block and continues with th
 """
 import argparse
 import datetime as dt
+import hashlib
 import html
 import json
 import re
@@ -149,6 +150,9 @@ def load_site(root=ROOT):
                 and isinstance(sec.get("heading"), str)):
             raise BuildError(f"site.json: section {i + 1} must look like {{\"id\": \"crosswords\", \"heading\": \"Crosswords\"}} "
                              "(a lower-case id other than 'posts')")
+    for sec in site.get("sections", []):
+        if "reading_time" in sec and not isinstance(sec["reading_time"], bool):
+            raise BuildError(f"site.json: section '{sec['id']}': 'reading_time' must be true or false")
     slugs = [site.get("posts_slug", "posts")] + [s["id"] for s in site.get("sections", [])]
     if len(set(slugs)) != len(slugs):
         raise BuildError("site.json: section ids, and posts_slug, must be unique")
@@ -289,7 +293,7 @@ def find_snippet(name, ctx):
         path = folder / f"{name}.html"
         if SNIPPET_NAME.match(name) and path.exists():
             return path
-    names = sorted({p.stem for folder in snippet_folders(ctx) for p in folder.glob("*.html")} | {"svg"})
+    names = sorted({p.stem for folder in snippet_folders(ctx) for p in folder.glob("*.html")} | {"svg", "crossword"})
     raise BuildError(f"{ctx.where}: there is no snippet called '{name}' (available: {', '.join(names)}). "
                      f"To write a literal {{{{ in the text, put a backslash before it.")
 
@@ -324,9 +328,164 @@ def inline_svg(positional, named, ctx):
     return text
 
 
+MAX_GRID = 40
+
+
+def crossword_error(where, message):
+    return BuildError(f"{where}: crossword: {message}")
+
+
+def ipuz_cell_value(cell):
+    """The letter in a solution cell (a plain string, or {"value": "A"}), or None for no value."""
+    if isinstance(cell, dict):
+        cell = cell.get("value")
+    return cell if isinstance(cell, str) else None
+
+
+def number_grid(solution):
+    """Standard crossword numbering of a grid of letters ('#' is a block): ({(row, col): number}, across words, down words);
+    a word is (number, [(row, col), ...])."""
+    h, w = len(solution), len(solution[0])
+    numbers, across, down, n = {}, [], [], 0
+    for r in range(h):
+        for c in range(w):
+            if solution[r][c] == "#":
+                continue
+            starts_across = (c == 0 or solution[r][c - 1] == "#") and c + 1 < w and solution[r][c + 1] != "#"
+            starts_down = (r == 0 or solution[r - 1][c] == "#") and r + 1 < h and solution[r + 1][c] != "#"
+            if starts_across or starts_down:
+                n += 1
+                numbers[(r, c)] = n
+            if starts_across:
+                end = c
+                while end < w and solution[r][end] != "#":
+                    end += 1
+                across.append((n, [(r, k) for k in range(c, end)]))
+            if starts_down:
+                end = r
+                while end < h and solution[end][c] != "#":
+                    end += 1
+                down.append((n, [(k, c) for k in range(r, end)]))
+    return numbers, across, down
+
+
+def read_ipuz(path, where):
+    """Read an .ipuz crossword (https://ipuz.org) into the compact form the player uses; anything unsupported is a BuildError.
+    Supported: rectangular grids with blocks, one letter or digit per square, Across/Down clues, circled squares (style.shapebg)."""
+    text = path.read_text(encoding="utf-8-sig").strip()
+    m = re.match(r"ipuz\((.*)\);?\Z", text, re.S)                     # some tools wrap the JSON the old JSONP way
+    try:
+        raw = json.loads(m.group(1) if m else text)
+    except ValueError as e:
+        raise crossword_error(where, f"{path.name} is not valid JSON ({e})") from None
+    if not isinstance(raw, dict):
+        raise crossword_error(where, f"{path.name} must contain a JSON object")
+    kinds = raw.get("kind")
+    if not (isinstance(kinds, list) and any(isinstance(k, str) and "ipuz.org/crossword" in k for k in kinds)):
+        raise crossword_error(where, f"{path.name} is not an ipuz crossword (its \"kind\" must name http://ipuz.org/crossword#1)")
+    dims = raw.get("dimensions")
+    try:
+        w, h = int(dims["width"]), int(dims["height"])
+    except (TypeError, KeyError, ValueError):
+        raise crossword_error(where, f"{path.name}: \"dimensions\" must give a width and a height") from None
+    if not (2 <= w <= MAX_GRID and 2 <= h <= MAX_GRID):
+        raise crossword_error(where, f"{path.name}: the grid must be between 2 and {MAX_GRID} squares each way, got {w} by {h}")
+    block = raw.get("block", "#")
+    rows, puzzle = raw.get("solution"), raw.get("puzzle")
+    for name, grid in (("solution", rows), ("puzzle", puzzle)):
+        if not (isinstance(grid, list) and len(grid) == h and all(isinstance(row, list) and len(row) == w for row in grid)):
+            raise crossword_error(where, f"{path.name}: \"{name}\" must be {h} rows of {w} squares to match \"dimensions\"")
+    solution, circles = [], []
+    for r in range(h):
+        line = []
+        for c in range(w):
+            cell, pcell = rows[r][c], puzzle[r][c]
+            value = ipuz_cell_value(cell)
+            pvalue = pcell.get("cell") if isinstance(pcell, dict) else pcell
+            if cell is None or pcell is None or pvalue == block or value in (block, "#"):
+                line.append("#")
+                continue
+            if not value:
+                raise crossword_error(where, f"{path.name}: the square in row {r + 1}, column {c + 1} has no solution letter")
+            if len(value) != 1 or not value.isalnum():
+                raise crossword_error(where, f"{path.name}: the square in row {r + 1}, column {c + 1} holds {value!r}; "
+                                              "only one letter or digit per square is supported (no rebus squares)")
+            line.append(value.upper())
+            style = pcell.get("style") if isinstance(pcell, dict) else None
+            if isinstance(style, dict) and style.get("shapebg") == "circle":
+                circles.append([r, c])
+        solution.append("".join(line))
+    numbers, across, down = number_grid(solution)
+    clues = raw.get("clues")
+    if not isinstance(clues, dict):
+        raise crossword_error(where, f"{path.name}: \"clues\" must have \"Across\" and \"Down\" lists")
+    found = {}
+    for direction, words in (("Across", across), ("Down", down)):
+        entries = clues.get(direction)
+        if not isinstance(entries, list):
+            raise crossword_error(where, f"{path.name}: \"clues\" has no \"{direction}\" list")
+        table = {}
+        for entry in entries:
+            if isinstance(entry, dict):
+                number, clue = entry.get("number"), entry.get("clue")
+            elif isinstance(entry, list) and len(entry) >= 2:
+                number, clue = entry[0], entry[1]
+            else:
+                raise crossword_error(where, f"{path.name}: a {direction} clue must look like [number, \"text\"]")
+            if not isinstance(clue, str) or not clue.strip():
+                raise crossword_error(where, f"{path.name}: {direction} clue {number} has no text")
+            try:
+                number = int(number)
+            except (TypeError, ValueError):
+                raise crossword_error(where, f"{path.name}: {direction} clue number {number!r} is not a number") from None
+            if number in table:
+                raise crossword_error(where, f"{path.name}: {direction} clue {number} appears twice")
+            table[number] = clue.strip()
+        have, want = set(table), {n for n, _ in words}
+        if have != want:
+            problems = [f"missing {sorted(want - have)}" if want - have else "", f"no such word {sorted(have - want)}" if have - want else ""]
+            raise crossword_error(where, f"{path.name}: the {direction} clues do not match the grid ({', '.join(p for p in problems if p)}); "
+                                         "numbers are counted from the solution grid")
+        found[direction] = [[n, table[n]] for n, _ in words]
+    meta = {key: raw[key].strip() for key in ("title", "author", "notes") if isinstance(raw.get(key), str) and raw[key].strip()}
+    ident = hashlib.sha1((f"{w}x{h}:" + "/".join(solution)).encode("utf-8")).hexdigest()[:12]
+    return {"id": ident, "w": w, "h": h, "grid": solution, "across": found["Across"], "down": found["Down"], "circles": circles, **meta}
+
+
+def crossword_html(puzzle, root):
+    """The markup for one crossword: a data block the player reads, a no-JavaScript fallback with the clues, and the player script."""
+    blob = (json.dumps(puzzle, separators=(",", ":"), ensure_ascii=True)
+            .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))              # nothing in the data can close the script block
+    title = f"<b>{esc(puzzle['title'])}</b>" if puzzle.get("title") else ""
+    by = f" by {esc(puzzle['author'])}" if puzzle.get("author") else ""
+    meta = f'<p class="cw-meta">{title}{by}</p>' if title or by else ""
+
+    def listing(label, key):
+        return f"<p><b>{label}</b></p><ol>" + "".join(f'<li value="{n}">{esc(c)}</li>' for n, c in puzzle[key]) + "</ol>"
+    return (f'<div class="crossword wide" data-id="{puzzle["id"]}">{meta}<script type="application/json" class="crossword-data">{blob}</script>'
+            f'<noscript><p>This crossword needs JavaScript to play. The clues:</p>{listing("Across", "across")}{listing("Down", "down")}</noscript></div>'
+            f'<script src="{root}theme/crossword.js" defer></script>')
+
+
+def render_crossword(positional, named, ctx):
+    src = named.get("src") or (positional[0] if positional else "")
+    if not isinstance(ctx.where, Path):
+        raise BuildError(f"{ctx.where}: {{{{crossword}}}} works in posts and pages, not here")
+    folder = ctx.where.with_suffix("").resolve()
+    path = (folder / src).resolve()
+    if not src or folder not in path.parents or path.suffix.lower() not in (".ipuz", ".json") or not path.is_file():
+        raise BuildError(f"{ctx.where}: {{{{crossword}}}} needs the name of an .ipuz file in the post's own folder "
+                         f"({folder.name}/), got {src!r}")
+    return crossword_html(read_ipuz(path, ctx.where), ctx.page_root)
+
+
 def render_snippet(name, positional, named, body, is_block, ctx):
     if name == "svg":
         return inline_svg(positional, named, ctx)
+    if name == "crossword":
+        if is_block:
+            raise BuildError(f"{ctx.where}: 'crossword' does not wrap content; write {{{{crossword file.ipuz}}}}")
+        return render_crossword(positional, named, ctx)
     path = find_snippet(name, ctx)
     template = path.read_text(encoding="utf-8")
     declared = {}
@@ -506,7 +665,9 @@ def entry_main(site, e, publish, root_dir=ROOT, engine=None):
         meta += ["Published", fmt_date(e["date"])]
     if e["kind"] == "post":
         meta += ["Authors", authors_html(site, e)]
-        meta += ["Reading time", f"{reading_minutes(body)} min"]
+        section = next((s for s in site["sections"] if s["id"] == e["section"]), {})
+        if section.get("reading_time", True):
+            meta += ["Reading time", f"{reading_minutes(body)} min"]
     meta_html = '<div class="meta">' + "".join(f"<span>{v}</span>" for v in meta) + "</div>"
     draft = '<p><span class="pill butter">draft: not published</span></p>' if e["draft"] and not publish else ""
     links = ('<div class="btns">' + "".join(f'<a class="btn" href="{esc(u)}">{esc(l)}</a>' for l, u in e["links"]) + "</div>") if e["links"] else ""

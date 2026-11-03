@@ -1,0 +1,13 @@
+{
+  "version": "http://ipuz.org/v2",
+  "kind": ["http://ipuz.org/crossword#1"],
+  "title": "Five by five",
+  "author": "Demo",
+  "dimensions": {"width": 5, "height": 5},
+  "puzzle": [[1, 2, 3, 4, 5], [6, 0, 0, 0, 0], [7, 0, 0, 0, 0], [8, 0, 0, 0, 0], [9, 0, 0, 0, 0]],
+  "solution": [["H", "E", "A", "R", "T"], ["E", "M", "B", "E", "R"], ["A", "B", "U", "S", "E"], ["R", "E", "S", "I", "N"], ["T", "R", "E", "N", "D"]],
+  "clues": {
+    "Across": [[1, "Organ that pumps blood"], [6, "Glowing coal in a dying fire"], [7, "Mistreat"], [8, "Sticky sap from pine trees"], [9, "Fashion of the moment"]],
+    "Down": [[1, "Core, as in the ___ of the matter"], [2, "Hot piece of ash"], [3, "Misuse"], [4, "Amber, before it hardens"], [5, "Where things are heading"]]
+  }
+}

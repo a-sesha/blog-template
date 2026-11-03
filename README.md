@@ -125,7 +125,7 @@ how every callout is built means editing one file.
 ```
 
 Built in (`theme/components/`): `callout`, `card`, `facts` + `fact`, `chips` + `chip`, `pill`, `button`, `figure`, `image`, `video`,
-`wide`, `full`, `term`, `quote`, `appendix`, `draft`, and the `svg` inliner. `components.html` shows each one live and what it takes.
+`wide`, `full`, `term`, `quote`, `appendix`, `draft`, the `svg` inliner and `crossword` (below). `components.html` shows each one live and what it takes.
 
 - **Your own pieces:** put `NAME.html` in `content/snippets/`. It wins over a built-in of the same name. In it, `{{key}}` is the
   argument HTML-escaped, `{{{key}}}` the argument as written, `{{key|default}}` gives a default (a blank `{{key|}}` makes it
@@ -136,6 +136,25 @@ Built in (`theme/components/`): `callout`, `card`, `facts` + `fact`, `chips` + `
 - **Mistakes** (unknown piece, a misspelt argument, a missing one, an unclosed block, an unmatched quote) stop the build with the
   file name and the list of what is accepted.
 - Shortcodes also work in the `intro` in `site.json`. A shortcode argument cannot contain `}}`.
+
+## Crosswords
+
+A crossword is an [`.ipuz`](https://ipuz.org) file (an open JSON format that many construction tools export) in the post's own folder:
+`content/posts/my-puzzle.html` with `content/posts/my-puzzle/grid.ipuz`, and in the body, directly (so it can use the wide slot):
+
+```
+{{crossword grid.ipuz}}
+```
+
+The build reads the file, numbers the grid itself and checks every clue against it, so a mistake stops the build with a message naming
+the file (missing or extra clues, a ragged grid, a rebus square). Supported: rectangular grids with blocks, one letter or digit per
+square, Across and Down clues, circled squares. The reader gets a board with the clue lists, a timer with pause, Check and Reveal
+(square, word or puzzle) and Clear; progress and time are kept in their own browser (`localStorage`) and never sent anywhere. Keys:
+letters, arrows, Space or Enter to turn, Tab and Shift+Tab for the next clue, Backspace, Escape to leave the board. Without JavaScript the
+clues are listed. The solution is in the page data (that is how Check and Reveal work offline), so it is not secret from a determined reader.
+
+For a section of puzzles, declare it in `site.json` and turn off the reading time: `{"id": "crosswords", "heading": "Crosswords",
+"reading_time": false}`, then give each puzzle post `section: crosswords` (and `authors:` for the setter).
 
 ## Making it yours
 
