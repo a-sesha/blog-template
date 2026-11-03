@@ -86,3 +86,21 @@ def test_nav_links_are_at_least_44px_tall_and_the_project_cards_use_readable_typ
     chip = re.search(r"\n\.chip\{([^}]*)\}", CSS).group(1)
     assert int(re.search(r"font-size:(\d+)px", chip).group(1)) >= 12
     assert "auto-fill" in re.search(r"\n\.chips\{([^}]*)\}", CSS).group(1)         # a lone card is not squeezed into a third of the row
+
+
+# ---- footer ----------------------------------------------------------------------------------------------------------------------------
+def build_home(tmp, **site_over):
+    site = make_site(tmp, posts={"a.html": post()}, **site_over)
+    B.build(site, site / "public")
+    return (site / "public" / "index.html").read_text(encoding="utf-8")
+
+
+def test_no_page_carries_a_font_credit_line(tmp_path):
+    assert "SIL Open Font License" not in build_home(tmp_path)
+
+
+def test_footer_default_custom_and_off(tmp_path):
+    assert "&copy;" in build_home(tmp_path / "a") and 'class="credit"' in build_home(tmp_path / "b")
+    assert "<p>Mine</p></footer>" in build_home(tmp_path / "c", footer="<p>Mine</p>")
+    off = build_home(tmp_path / "d", footer=False)
+    assert "<footer" not in off and "&copy;" not in off

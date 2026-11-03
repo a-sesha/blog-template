@@ -428,6 +428,14 @@ def nav_html(site, root, current):
     return "".join(items)
 
 
+def footer_html(site):
+    """The page footer: the site's own HTML, a default copyright line when left empty, nothing at all when "footer" is false."""
+    if site["footer"] is False:
+        return ""
+    default = f"<p>&copy; {dt.date.today().year} {esc(site['author'])}</p>"
+    return f'<footer class="credit">{site["footer"] or default}</footer>'
+
+
 def page_html(site, template, *, title, description, root, main, current="", og_type="website", image="", canonical_path="", has_feed=False,
               styles=(), scripts=()):
     base = site["url"]
@@ -446,7 +454,7 @@ def page_html(site, template, *, title, description, root, main, current="", og_
         "brand": esc(site["title"]), "nav": nav_html(site, root, current), "main": main,
         "head_extra": "".join(f'<link rel="stylesheet" href="{esc(x)}">' for x in styles),
         "scripts": "".join(f'<script src="{esc(x)}"></script>' for x in scripts),
-        "footer": site["footer"] or f"<p>&copy; {dt.date.today().year} {esc(site['author'])}</p>"})
+        "footer": footer_html(site)})
 
 
 def entry_main(site, e, publish, root_dir=ROOT, engine=None):

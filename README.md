@@ -25,6 +25,9 @@ python -m pytest tests     # the test suite (needs pytest)
    from `nav` in `site.json`.
 4. Upload the contents of `public/` to any static host (GitHub Pages, Netlify, Cloudflare Pages, a plain web server).
 
+The footer is the `footer` HTML in `site.json`; leave it empty for a copyright line, or set `"footer": false` for none. The fonts' licence texts
+ship in `theme/fonts/`; no credit line is added to the pages.
+
 ## Front matter
 
 ```
