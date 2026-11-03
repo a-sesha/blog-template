@@ -1,9 +1,11 @@
-# Runs the test suite on every push and pull request.
+# Runs the test suite on every push, pull request and release tag, and can be started by hand.
 name: Tests
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
@@ -19,3 +21,4 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install pytest
       - run: python -m pytest -q
+      - run: python build.py --publish --check          # the shipped example site builds and every link resolves
