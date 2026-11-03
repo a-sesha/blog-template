@@ -205,3 +205,9 @@ def test_the_finishing_flourish_is_switched_off_for_readers_who_ask_for_less_mot
     assert re.search(r"@media \(prefers-reduced-motion:reduce\)\{[^}]*\.cw-wave[^}]*animation:none", css)
     js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
     assert "helpedCount() === 0" in js and "cw-solved" in js and "cw-wave" in js                  # no celebration when squares were revealed
+
+
+def test_open_menus_close_on_an_outside_click_escape_tab_away_and_when_the_other_opens():
+    js = (ROOT / "theme" / "crossword.js").read_text(encoding="utf-8")
+    assert "document.addEventListener('click'" in js and "m.contains(e.target)" in js
+    assert "e.key === 'Escape') closeMenus" in js and "addEventListener('focusout'" in js and "addEventListener('toggle'" in js

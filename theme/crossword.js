@@ -100,6 +100,8 @@
     timerBtn.appendChild(playIcon); timerBtn.appendChild(timeText);
     bar.appendChild(timerBtn);
 
+    var menus = [];
+    function closeMenus(except) { menus.forEach(function (m) { if (m !== except && m.open) m.open = false; }); }
     function menu(label, actions) {
       var d = el('details', 'cw-menu'), s = el('summary', 'btn', label), box = el('div', 'cw-menu-items');
       actions.forEach(function (a) {
@@ -109,10 +111,19 @@
         box.appendChild(b);
       });
       d.appendChild(s); d.appendChild(box);
+      d.addEventListener('toggle', function () { if (d.open) closeMenus(d); });      // opening one closes the other
+      menus.push(d);
       return d;
     }
     bar.appendChild(menu('Check', [['Square', function () { check('square'); }], ['Word', function () { check('word'); }], ['Puzzle', function () { check('puzzle'); }]]));
     bar.appendChild(menu('Reveal', [['Square', function () { reveal('square'); }], ['Word', function () { reveal('word'); }], ['Puzzle', function () { reveal('puzzle'); }]]));
+    document.addEventListener('click', function (e) {                           // a click anywhere else, or on the board, closes an open menu
+      menus.forEach(function (m) { if (m.open && !m.contains(e.target)) m.open = false; });
+    });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenus(null); });
+    bar.addEventListener('focusout', function (e) {                             // tabbing out of a menu closes it
+      menus.forEach(function (m) { if (m.open && e.relatedTarget && !m.contains(e.relatedTarget)) m.open = false; });
+    });
     var clear = el('button', 'btn', 'Clear');
     clear.type = 'button';
     bar.appendChild(clear);
