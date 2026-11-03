@@ -1,7 +1,7 @@
 # blog-template
 
 A small personal blog in a paper-and-ink style: warm off-white page, light serif headings, monospace for data, square cards with hard
-shadows, graph-paper figures. No framework, no dependencies, no server: you write HTML files, run one Python script (standard
+shadows, graph-paper figures. No framework, no libraries, no server: you write HTML files, run one Python script (standard
 library only, Python 3.10+) and upload a folder.
 
 The look was extracted from the project blog it grew out of. Its visual language is modelled on the research-lab posts that style
@@ -12,7 +12,7 @@ substitutes. The tokens are at the top of `theme/style.css`, so a few edits make
 
 ```bash
 python build.py            # writes public/ ; open public/index.html in a browser, no server needed
-python build.py --check    # also verifies every link, image, script, font and #anchor in the output exists
+python build.py --check    # also verifies every link, image, script, font and #anchor in the output exists (letter case included, as on a real host)
 python build.py --publish  # the version to upload: no drafts, no draft-only notes
 python -m pytest tests     # the test suite (needs pytest)
 ```
@@ -27,7 +27,7 @@ python -m pytest tests     # the test suite (needs pytest)
 
 The heading above the post list on the home page is `"posts_heading"` in `site.json` (default "Posts"; the address stays `#posts`).
 Extra home-page lists: declare them in `site.json`, e.g. `"sections": [{"id": "crosswords", "heading": "Crosswords"}]`, and give a post
-`section: crosswords`. Posts without a `section` stay under `posts_heading`. The home page is the overview, with every list; each list also gets a page of its own that
+`section: crosswords`. Posts without a `section` stay under `posts_heading`. A section may set `"reading_time": false` to drop the Reading time row from its posts. The home page is the overview, with every list; each list also gets a page of its own that
 shows only its entries: `crosswords/index.html` for a section (its `id`), and `posts/index.html` for the main list, or whatever `"posts_slug"` says
 (`"posts_slug": "musings"`). Point `nav` at those. An unknown section name, or a section address that a post or page already uses, stops the build.
 
@@ -40,6 +40,23 @@ There are no tags: a `tags:` line in old front matter is ignored.
 
 The footer is the `footer` HTML in `site.json`; leave it empty for a copyright line, or set `"footer": false` for none. The fonts' licence texts
 ship in `theme/fonts/`; no credit line is added to the pages.
+
+## site.json
+
+| Key | Default | What it does |
+|---|---|---|
+| `title`, `author` | required | the site's name; the default author of a post |
+| `description`, `lang` | `""`, `"en"` | meta description; the `lang` of every page |
+| `url` | `""` | the final address; switches on `feed.xml`, `sitemap.xml` and canonical links |
+| `intro` | `""` | HTML above the lists on the home page (shortcodes work, except `crossword`) |
+| `nav` | `[]` | `[{"label": "About", "href": "about/index.html"}]` |
+| `footer` | `""` | HTML; empty gives a copyright line with the year, `false` gives no footer |
+| `posts_heading`, `posts_slug` | `"Posts"`, `"posts"` | the heading and the page address of the main list |
+| `sections` | `[]` | extra lists, `{"id", "heading", "reading_time"?}`, each with its own page (below) |
+| `dark_mode` | `false` | follow the reader's system colour scheme (see "Making it yours") |
+| `author_pages` | `false` | link each author to a page of their posts (below) |
+
+A value of the wrong type (`"dark_mode": "yes"`, `"nav": null`) stops the build with a message naming the key.
 
 ## Front matter
 
@@ -128,7 +145,7 @@ how every callout is built means editing one file.
 Built in (`theme/components/`): `callout`, `card`, `facts` + `fact`, `chips` + `chip`, `pill`, `button`, `figure`, `image`, `video`,
 `wide`, `full`, `term`, `quote`, `appendix`, `draft`, the `svg` inliner and `crossword` (below). `components.html` shows each one live and what it takes.
 
-- **Your own pieces:** put `NAME.html` in `content/snippets/`. It wins over a built-in of the same name. In it, `{{key}}` is the
+- **Your own pieces:** put `NAME.html` in `content/snippets/`. It wins over a built-in of the same name (except `svg` and `crossword`, which are part of the engine). In it, `{{key}}` is the
   argument HTML-escaped, `{{{key}}}` the argument as written, `{{key|default}}` gives a default (a blank `{{key|}}` makes it
   optional; leaving out an argument with no default is an error), `{{1}}` is the first plain argument, `{{{body}}}` the wrapped content and
   `{{{root}}}` the path back to the site root (`../` in a post), so images and links work from any depth.
@@ -152,7 +169,8 @@ the file (missing or extra clues, a ragged grid, a rebus square). Supported: rec
 square, Across and Down clues, circled squares. The reader gets a board with the clue lists, a timer with pause, Check and Reveal
 (square, word or puzzle) and Clear; progress and time are kept in their own browser (`localStorage`) and never sent anywhere. Keys:
 letters, arrows, Space or Enter to turn, Tab and Shift+Tab for the next clue, Backspace, Escape to leave the board. Without JavaScript the
-clues are listed. The solution is in the page data (that is how Check and Reveal work offline), so it is not secret from a determined reader.
+clues are listed. The solution is in the page data (that is how Check and Reveal work offline), so it is not secret from a determined reader. Grids are 2 to 40 squares
+each way, a file may also end in `.json`, and `{{crossword}}` works in posts and pages but not in `intro`.
 
 For a section of puzzles, declare it in `site.json` and turn off the reading time: `{"id": "crosswords", "heading": "Crosswords",
 "reading_time": false}`, then give each puzzle post `section: crosswords` (and `authors:` for the setter).
@@ -173,12 +191,15 @@ For a section of puzzles, declare it in `site.json` and turn off the reading tim
   under the tokens (applied to `html[data-scheme="auto"]`), and `theme-color` gets a dark twin; the tests check its contrast. Cards, code and
   tooltips use `--surface`, text on the yellow highlight uses `--on-butter`. Inline figures keep their literal colours (`#fff`, `#000`,
   `#B4B3AF`, `#EEEDE8`) because the stylesheet maps those onto the tokens; give text that sits on a butter shape `class="note"` so it stays black.
-- **Not included on purpose:** comments, analytics, a search box, tag pages. Add what you need; nothing depends on it.
+- **Not included on purpose:** comments, analytics, a search box, tags, pagination. Add what you need; nothing depends on it.
 
 ## How it is built
 
 `build.py` reads `site.json`, `content/` and `theme/`, and writes `public/`: one folder per post (`public/my-post/index.html`),
-the theme, the images, and optionally the feed and sitemap. All links are relative, so the folder also works opened from disk or from
+one for each list (`public/posts/`, one per section) and, with `author_pages`, `public/authors/`; plus the theme, the images, and optionally the
+feed and sitemap. Every page is rendered before anything is written, so a mistake leaves the previous output as it was. The theme's stylesheet
+and scripts are linked with `?v=<hash of the file>`, so a host that caches for minutes never pairs a new page with an old stylesheet.
+Symbolic links in a post's folder or in `content/images/` are refused, and dotfiles there are not published. All links are relative, so the folder also works opened from disk or from
 a sub-path of a host. The output folder is cleared on each build, but only if this tool made it (a marker file), so a wrong `--out`
 cannot delete your own files. It also refuses an output folder that is, contains or sits inside `content/` or `theme/`. The marker file
 (`.blog-template-build`) is copied with the site; it is harmless and you can leave it out when you upload.
@@ -191,7 +212,7 @@ drafts left out of the feed, draft notes absent from the published source, uniqu
 ## Versions
 
 Releases are git tags (`v0.1.0`, ...). A site that builds in CI should name a tag rather than follow `main`, and move to a newer
-one only after a `--publish --check` build looks right.
+one only after a `--publish --check` build looks right. `CHANGELOG.md` lists what changed in each tag.
 
 ## Licence
 

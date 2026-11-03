@@ -9,14 +9,19 @@
 
 Sources: site.json, content/posts/*.html, content/pages/*.html (pages are not listed on the home page), content/drafts/*.html
 (posts that are always drafts: a place for work in progress that you keep out of git), content/images/*,
-theme/. Each content file starts with a front-matter block and continues with the HTML of the page body:
+content/snippets/*.html (your own reusable pieces), theme/. Each content file starts with a front-matter block and continues with the HTML of the page body:
 
     ---
     title: Three ways to imagine a forest trail
     date: 2026-10-26
     description: One sentence for the home page, search results and link previews.
-    links: Code | https://github.com/you/repo; Paper | https://arxiv.org/abs/0000.00000
+    authors: A. Writer, B. Coauthor
+    links: Code | https://github.com/you/repo; Paper | https://arxiv.org/abs/0000.00000   (a blank address hides the button)
     image: images/teaser.jpg
+    section: crosswords
+    slug: other-address
+    styles: post.css
+    scripts: figures.js
     toc: true
     draft: true
     ---
@@ -42,6 +47,10 @@ ROOT = ENGINE                                           # the site built by defa
 MARKER = ".blog-template-build"
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "param", "source", "track", "wbr"}
 RESERVED = {"theme", "images", "feed", "sitemap", "index"}
+WINDOWS_DEVICES = {"con", "prn", "aux", "nul"} | {f"com{i}" for i in range(1, 10)} | {f"lpt{i}" for i in range(1, 10)}    # not usable as a file name there
+READING_WPM = 230
+PAPER_LIGHT, PAPER_DARK = "#F5F4EF", "#17160F"                       # the two page colours, as in theme/style.css
+EXTERNAL = re.compile(r"([a-z][a-z0-9+.-]*:|//)", re.I)               # an address that leaves the site: https:, mailto:, //host
 SLUG = re.compile(r"[a-z0-9][a-z0-9-]*\Z")
 SECTION_RESERVED = RESERVED | {"content"}                 # section addresses are also ids on the home page; "content" is <main>
 
@@ -50,9 +59,17 @@ class BuildError(Exception):
     """Something the author must fix; reported as a plain message, not a traceback."""
 
 
+def read_text(path):
+    """A file the author wrote, as UTF-8 (a leading BOM is fine); anything else is a message naming the file, not a traceback."""
+    try:
+        return Path(path).read_text(encoding="utf-8-sig")
+    except UnicodeDecodeError:
+        raise BuildError(f"{path}: not UTF-8 text; save the file as UTF-8") from None
+
+
 # ---- reading content ------------------------------------------------------------------------------------------------
 def parse_front_matter(text, source):
-    text = text.replace("\r\n", "\n").lstrip("﻿")
+    text = text.replace("\r\n", "\n").lstrip("\ufeff")
     m = re.match(r"---[ \t]*\n(.*?)\n---[ \t]*(?:\n|\Z)(.*)\Z", text, re.S)
     if not m:
         raise BuildError(f"{source}: the file must start with a front-matter block between two '---' lines")
@@ -85,8 +102,15 @@ def parse_links(value, where):
     return links
 
 
-def truthy(value):
-    return str(value).strip().lower() in ("1", "true", "yes", "y")
+BOOL_WORDS = {"1": True, "true": True, "yes": True, "y": True, "0": False, "false": False, "no": False, "n": False, "": False}
+
+
+def parse_bool(meta, key, path):
+    """A front-matter flag. Anything that is not clearly yes or no is an error, so `draft: on` cannot quietly publish a draft."""
+    raw = meta.get(key, "").strip().lower()
+    if raw not in BOOL_WORDS:
+        raise BuildError(f"{path}: '{key}' must be true or false, got {meta[key]!r}")
+    return BOOL_WORDS[raw]
 
 
 def local_files(value, path, key):
@@ -103,28 +127,31 @@ def local_files(value, path, key):
 
 
 def load_entry(path, kind):
-    meta, body = parse_front_matter(path.read_text(encoding="utf-8"), path)
+    meta, body = parse_front_matter(read_text(path), path)
     slug = meta.get("slug") or path.stem
-    if not SLUG.match(slug) or slug in RESERVED:
-        raise BuildError(f"{path}: '{slug}' is not a usable address; use lower-case letters, digits and '-' (reserved: {sorted(RESERVED)})")
+    if not SLUG.match(slug) or slug in RESERVED or slug in WINDOWS_DEVICES:
+        raise BuildError(f"{path}: '{slug}' is not a usable address; use lower-case letters, digits and '-' "
+                         f"(reserved: {sorted(RESERVED)} and the Windows device names such as con, nul, com1)")
     if not meta.get("title"):
         raise BuildError(f"{path}: a title is required")
     date = None
     if kind == "post" or meta.get("date"):
         try:
-            date = dt.date.fromisoformat(meta.get("date", ""))
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", meta.get("date", "")):            # Python 3.11+ also takes 20261026; 3.10 does not
+                raise ValueError
+            date = dt.date.fromisoformat(meta["date"])
         except ValueError:
             raise BuildError(f"{path}: date must be written YYYY-MM-DD, got {meta.get('date')!r}") from None
     return {"kind": kind, "slug": slug, "title": meta["title"], "date": date, "description": meta.get("description", ""),
-            "draft": truthy(meta.get("draft", "")),
-            "section": meta.get("section", "").strip(), "image": meta.get("image", ""), "authors": meta.get("authors", ""), "toc": truthy(meta.get("toc", "")),
+            "draft": parse_bool(meta, "draft", path),
+            "section": meta.get("section", "").strip(), "image": meta.get("image", ""), "authors": meta.get("authors", ""), "toc": parse_bool(meta, "toc", path),
             "links": parse_links(meta.get("links", ""), path), "body": body, "source": path,
             "styles": local_files(meta.get("styles", ""), path, "styles"), "scripts": local_files(meta.get("scripts", ""), path, "scripts")}
 
 
 def load_site(root=ROOT):
     try:
-        site = json.loads((root / "site.json").read_text(encoding="utf-8"))
+        site = json.loads(read_text(root / "site.json"))
     except FileNotFoundError:
         raise BuildError(f"{root / 'site.json'} not found") from None
     except ValueError as e:
@@ -157,7 +184,7 @@ def load_site(root=ROOT):
     if len(set(slugs)) != len(slugs):
         raise BuildError("site.json: section ids, and posts_slug, must be unique")
     for slug in slugs:
-        if not SLUG.match(slug) or slug in SECTION_RESERVED:
+        if not SLUG.match(slug) or slug in SECTION_RESERVED or slug in WINDOWS_DEVICES:
             raise BuildError(f"site.json: '{slug}' is not a usable section address; use lower-case letters, digits and '-' (reserved: {sorted(SECTION_RESERVED)})")
     if site.get("url") and not re.match(r"https?://[^/\s]+", site["url"]):
         raise BuildError("site.json: 'url' must start with https:// (or http://), for example https://you.example")
@@ -249,10 +276,12 @@ class DraftStripper(HTMLParser):
         self._keep(f"<![{data}]]>" if data.startswith("CDATA[") else f"<![{data}]>")
 
 
-def strip_draft_only(body):
+def strip_draft_only(body, where=""):
     p = DraftStripper()
     p.feed(body)
     p.close()
+    if p.skip_tag:                                           # HTML may leave out </p> or </li>; this would swallow the rest of the page
+        raise BuildError(f"{where}: a class=\"draft-only\" <{p.skip_tag}> is never closed; write </{p.skip_tag}> so --publish removes only the note")
     return "".join(p.out)
 
 
@@ -320,7 +349,7 @@ def inline_svg(positional, named, ctx):
     path = (images / src).resolve()
     if not src or images not in path.parents or path.suffix.lower() != ".svg" or not path.is_file():
         raise BuildError(f"{ctx.where}: {{{{svg}}}} needs the name of an .svg file inside content/images/, got {src!r}")
-    text, prolog = path.read_text(encoding="utf-8").strip(), re.compile(r"(<\?xml.*?\?>|<!DOCTYPE[^>]*>|<!--.*?-->)\s*", re.S | re.I)
+    text, prolog = read_text(path).strip(), re.compile(r"(<\?xml.*?\?>|<!DOCTYPE[^>]*>|<!--.*?-->)\s*", re.S | re.I)
     while prolog.match(text):
         text = text[prolog.match(text).end():]
     if not text.startswith("<svg"):
@@ -372,7 +401,7 @@ def number_grid(solution):
 def read_ipuz(path, where):
     """Read an .ipuz crossword (https://ipuz.org) into the compact form the player uses; anything unsupported is a BuildError.
     Supported: rectangular grids with blocks, one letter or digit per square, Across/Down clues, circled squares (style.shapebg)."""
-    text = path.read_text(encoding="utf-8-sig").strip()
+    text = read_text(path).strip()
     m = re.match(r"ipuz\((.*)\);?\Z", text, re.S)                     # some tools wrap the JSON the old JSONP way
     try:
         raw = json.loads(m.group(1) if m else text)
@@ -381,17 +410,21 @@ def read_ipuz(path, where):
     if not isinstance(raw, dict):
         raise crossword_error(where, f"{path.name} must contain a JSON object")
     kinds = raw.get("kind")
-    if not (isinstance(kinds, list) and any(isinstance(k, str) and "ipuz.org/crossword" in k for k in kinds)):
+    if isinstance(kinds, str):
+        kinds = [kinds]
+    if not (isinstance(kinds, list) and any(isinstance(k, str) and re.fullmatch(r"https?://ipuz\.org/crossword#\d+", k) for k in kinds)):
         raise crossword_error(where, f"{path.name} is not an ipuz crossword (its \"kind\" must name http://ipuz.org/crossword#1)")
     dims = raw.get("dimensions")
     try:
         w, h = int(dims["width"]), int(dims["height"])
-    except (TypeError, KeyError, ValueError):
+    except (TypeError, KeyError, ValueError, OverflowError):
         raise crossword_error(where, f"{path.name}: \"dimensions\" must give a width and a height") from None
     if not (2 <= w <= MAX_GRID and 2 <= h <= MAX_GRID):
         raise crossword_error(where, f"{path.name}: the grid must be between 2 and {MAX_GRID} squares each way, got {w} by {h}")
     block = raw.get("block", "#")
     rows, puzzle = raw.get("solution"), raw.get("puzzle")
+    if rows is None:
+        raise crossword_error(where, f"{path.name} has no \"solution\" grid; the player needs the answers to check and reveal")
     for name, grid in (("solution", rows), ("puzzle", puzzle)):
         if not (isinstance(grid, list) and len(grid) == h and all(isinstance(row, list) and len(row) == w for row in grid)):
             raise crossword_error(where, f"{path.name}: \"{name}\" must be {h} rows of {w} squares to match \"dimensions\"")
@@ -407,15 +440,23 @@ def read_ipuz(path, where):
                 continue
             if not value:
                 raise crossword_error(where, f"{path.name}: the square in row {r + 1}, column {c + 1} has no solution letter")
-            if len(value) != 1 or not value.isalnum():
+            if not re.fullmatch(r"[A-Za-z0-9]", value):
                 raise crossword_error(where, f"{path.name}: the square in row {r + 1}, column {c + 1} holds {value!r}; "
-                                              "only one letter or digit per square is supported (no rebus squares)")
+                                              "only one letter A to Z or digit per square is supported (no rebus squares)")
             line.append(value.upper())
             style = pcell.get("style") if isinstance(pcell, dict) else None
             if isinstance(style, dict) and style.get("shapebg") == "circle":
                 circles.append([r, c])
         solution.append("".join(line))
     numbers, across, down = number_grid(solution)
+    covered = {cell for _, cells in across + down for cell in cells}
+    if not covered:
+        raise crossword_error(where, f"{path.name}: the grid has no words (a word is two or more squares in a row or column)")
+    for r in range(h):
+        for c in range(w):
+            if solution[r][c] != "#" and (r, c) not in covered:
+                raise crossword_error(where, f"{path.name}: the square in row {r + 1}, column {c + 1} is in no word; "
+                                              "make it a block, or give it a neighbour in its row or column")
     clues = raw.get("clues")
     if not isinstance(clues, dict):
         raise crossword_error(where, f"{path.name}: \"clues\" must have \"Across\" and \"Down\" lists")
@@ -435,8 +476,10 @@ def read_ipuz(path, where):
             if not isinstance(clue, str) or not clue.strip():
                 raise crossword_error(where, f"{path.name}: {direction} clue {number} has no text")
             try:
+                if isinstance(number, bool):
+                    raise ValueError
                 number = int(number)
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 raise crossword_error(where, f"{path.name}: {direction} clue number {number!r} is not a number") from None
             if number in table:
                 raise crossword_error(where, f"{path.name}: {direction} clue {number} appears twice")
@@ -476,7 +519,9 @@ def render_crossword(positional, named, ctx):
     if not src or folder not in path.parents or path.suffix.lower() not in (".ipuz", ".json") or not path.is_file():
         raise BuildError(f"{ctx.where}: {{{{crossword}}}} needs the name of an .ipuz file in the post's own folder "
                          f"({folder.name}/), got {src!r}")
-    return crossword_html(read_ipuz(path, ctx.where), ctx.page_root)
+    puzzle = read_ipuz(path, ctx.where)
+    puzzle["id"] = hashlib.sha1(f"{ctx.where.stem}/{puzzle['id']}".encode("utf-8")).hexdigest()[:12]      # saved progress belongs to this page
+    return crossword_html(puzzle, ctx.page_root)
 
 
 def render_snippet(name, positional, named, body, is_block, ctx):
@@ -487,10 +532,8 @@ def render_snippet(name, positional, named, body, is_block, ctx):
             raise BuildError(f"{ctx.where}: 'crossword' does not wrap content; write {{{{crossword file.ipuz}}}}")
         return render_crossword(positional, named, ctx)
     path = find_snippet(name, ctx)
-    template = path.read_text(encoding="utf-8")
-    declared = {}
-    for m in PLACEHOLDER.finditer(template):
-        declared.setdefault(m.group(1) or m.group(3), None)
+    template = read_text(path)
+    declared = {m.group(1) or m.group(3) for m in PLACEHOLDER.finditer(template)}
     params = {k for k in declared if k not in RESERVED_PARAMS and not k.isdigit()}
     slots = {int(k) for k in declared if k.isdigit()}
     unknown = sorted(set(named) - params)
@@ -501,6 +544,8 @@ def render_snippet(name, positional, named, body, is_block, ctx):
         raise BuildError(f"{ctx.where}: '{name}' takes {max(slots, default=0)} plain argument(s), got {len(positional)}")
     if is_block and "body" not in declared:
         raise BuildError(f"{ctx.where}: '{name}' does not wrap content; write {{{{{name} ...}}}} without #, and no {{{{/{name}}}}}")
+    if "href" in named:
+        named["href"] = safe_url(named["href"], ctx.where)
     values = {**named, **{str(i + 1): v for i, v in enumerate(positional)}}
 
     def fill(m):
@@ -585,7 +630,7 @@ def add_heading_ids(body):
 def reading_minutes(body):
     text = re.sub(r"<(script|style|svg)\b.*?</\1>", " ", body, flags=re.S | re.I)
     words = len(re.sub(r"<[^>]+>", " ", text).split())
-    return max(1, round(words / 230))
+    return max(1, round(words / READING_WPM))
 
 
 # ---- rendering ----------------------------------------------------------------------------------------------------
@@ -621,10 +666,10 @@ def nav_html(site, root, current):
 
 
 def theme_color(site):
-    light = '<meta name="theme-color" content="#F5F4EF"'
+    light = f'<meta name="theme-color" content="{PAPER_LIGHT}"'
     if not site["dark_mode"]:
         return light + ">"
-    return f'{light} media="(prefers-color-scheme: light)"><meta name="theme-color" content="#17160F" media="(prefers-color-scheme: dark)">'
+    return f'{light} media="(prefers-color-scheme: light)"><meta name="theme-color" content="{PAPER_DARK}" media="(prefers-color-scheme: dark)">'
 
 
 def footer_html(site):
@@ -658,7 +703,7 @@ def page_html(site, template, *, title, description, root, main, current="", og_
 
 def entry_main(site, e, publish, root_dir=ROOT, engine=None):
     body = expand_shortcodes(e["body"], Ctx(root_dir, "../", e["source"], engine))
-    body = strip_draft_only(body) if publish else body
+    body = strip_draft_only(body, e["source"]) if publish else body
     body, toc = add_heading_ids(body)
     meta = []
     if e["date"]:
@@ -692,7 +737,7 @@ def author_slug(name):
 def authors_html(site, e):
     """The value of the Authors row: plain text, or a link to each author's page when site.json sets "author_pages": true."""
     if not site["author_pages"]:
-        return esc(e["authors"] or site["author"])
+        return esc(", ".join(author_names(site, e)))
     return ", ".join(f'<a href="../authors/{author_slug(n)}/index.html">{esc(n)}</a>' for n in author_names(site, e))
 
 
@@ -702,8 +747,8 @@ def author_index(site, posts):
     for p in posts:
         for name in author_names(site, p):
             slug = author_slug(name)
-            if not slug:
-                raise BuildError(f"{p['source']}: the author '{name}' has no letters or digits to make an address from")
+            if not slug or slug in WINDOWS_DEVICES:
+                raise BuildError(f"{p['source']}: the author '{name}' has no usable address (letters and digits only, and not a Windows device name)")
             known, items = found.setdefault(slug, (name, []))
             if known != name:
                 raise BuildError(f"{p['source']}: the authors '{known}' and '{name}' would both live at authors/{slug}/; write the name the same way everywhere")
@@ -761,7 +806,7 @@ def section_lists(site, posts):
     return lists
 
 
-def home_main(site, posts, publish, root_dir=ROOT, engine=None):
+def home_main(site, posts, root_dir=ROOT, engine=None):
     """The overview: the intro, then every list (the main one under `posts_heading`, then one per extra section)."""
     intro = expand_shortcodes(site["intro"], Ctx(root_dir, "", "site.json (intro)", engine))
     parts = "\n".join(f'<h2 id="{anchor}">{section_link(slug, heading, "")}</h2>\n{entry_list(items)}' for slug, anchor, heading, items in section_lists(site, posts))
@@ -773,17 +818,25 @@ def section_main(heading, items):
     return f"<h1>{esc(heading)}</h1>\n{entry_list(items, '../')}"
 
 
+XML_UNFIT = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\ufffe\uffff]")
+
+
+def xesc(text):
+    """esc() for the feed: also drops the control characters XML 1.0 cannot hold."""
+    return esc(XML_UNFIT.sub("", text))
+
+
 def atom_feed(site, posts):
     base = site["url"]
     updated = max(p["date"] for p in posts).isoformat() if posts else dt.date.today().isoformat()
     out = ['<?xml version="1.0" encoding="utf-8"?>', '<feed xmlns="http://www.w3.org/2005/Atom">',
-           f'<title>{esc(site["title"])}</title>', f'<id>{esc(base)}/</id>', f'<link href="{esc(base)}/"/>',
-           f'<link rel="self" href="{esc(base)}/feed.xml"/>', f'<updated>{updated}T00:00:00Z</updated>',
-           f'<author><name>{esc(site["author"])}</name></author>']
+           f'<title>{xesc(site["title"])}</title>', f'<id>{xesc(base)}/</id>', f'<link href="{xesc(base)}/"/>',
+           f'<link rel="self" href="{xesc(base)}/feed.xml"/>', f'<updated>{updated}T00:00:00Z</updated>',
+           f'<author><name>{xesc(site["author"])}</name></author>']
     for p in posts:
         url = f'{base}/{p["slug"]}/index.html'
-        out += ["<entry>", f'<title>{esc(p["title"])}</title>', f'<id>{esc(url)}</id>', f'<link href="{esc(url)}"/>',
-                f'<updated>{p["date"].isoformat()}T00:00:00Z</updated>', f'<summary>{esc(p["description"])}</summary>', "</entry>"]
+        out += ["<entry>", f'<title>{xesc(p["title"])}</title>', f'<id>{xesc(url)}</id>', f'<link href="{xesc(url)}"/>',
+                f'<updated>{p["date"].isoformat()}T00:00:00Z</updated>', f'<summary>{xesc(p["description"])}</summary>', "</entry>"]
     out.append("</feed>")
     return "\n".join(out) + "\n"
 
@@ -800,12 +853,11 @@ def sitemap(site, entries, extra=()):
 
 
 # ---- the build ------------------------------------------------------------------------------------------------------------
-def check_output_location(root, out):
-    root, out = Path(root).resolve(), Path(out).resolve()
+def check_output_location(root, out, engine=None):
+    root, out, engine = Path(root).resolve(), Path(out).resolve(), Path(engine or ENGINE).resolve()
     if out == root or out in root.parents:
         raise BuildError(f"{out} contains the site's sources; choose an output folder of its own (default: public/)")
-    for part in ("content", "theme"):
-        src = root / part
+    for part, src in (("content", root / "content"), ("theme", root / "theme"), ("theme", engine / "theme")):
         if out == src or src in out.parents:
             raise BuildError(f"{out} is inside {part}/, which is copied into the output; choose another --out")
 
@@ -822,6 +874,79 @@ def prepare_output(out):
     (out / MARKER).write_text("generated by build.py; safe to delete\n", encoding="utf-8")
 
 
+def tree_ignore(*skip):
+    """A shutil.copytree `ignore` callback: leaves out the named files and dotfiles and refuses symbolic links, because a link
+    committed to a repository could point at a file outside it and get published."""
+    def ignore(directory, names):
+        for name in names:
+            if os.path.islink(os.path.join(directory, name)):
+                raise BuildError(f"{Path(directory) / name} is a symbolic link; put a real copy of the file there instead")
+        return [n for n in names if n in skip or n.startswith(".")]
+    return ignore
+
+
+def check_addresses(site, loaded):
+    """Mistakes that only show when site.json and the entries are read together. Drafts count, so --publish cannot hide one that a
+    normal build reports."""
+    known = {s["id"] for s in site["sections"]}
+    taken = set(section_slugs(site))
+    if site["author_pages"] and "authors" in taken:
+        raise BuildError("site.json: a section cannot use the address 'authors' while \"author_pages\" is on")
+    for e in loaded:
+        if e["section"] and e["section"] not in known:
+            raise BuildError(f"{e['source']}: section '{e['section']}' is not listed under \"sections\" in site.json (known: {sorted(known) or 'none'})")
+        if site["author_pages"] and e["slug"] == "authors":
+            raise BuildError(f"{e['source']}: the address 'authors' is used by the author pages (site.json \"author_pages\"); give the file another name or a slug")
+        if e["slug"] in taken:
+            raise BuildError(f"{e['source']}: the address '{e['slug']}' is a section page (see site.json); give the file another name or a slug")
+        if (e["source"].with_suffix("") / "index.html").exists():
+            raise BuildError(f"{e['source'].with_suffix('')}: a page folder may not contain index.html (the page itself is {e['source'].name})")
+
+
+def render_pages(site, template, entries, posts, authors, publish, root, engine):
+    """Every page of the site as [(folder, html, own folder)]: where it goes under the output ("" is the home page), its index.html text,
+    and the post's own folder of files, if it has one. Rendering comes before the output folder is touched, so a mistake found here
+    leaves the previous build as it was."""
+    has_feed = bool(site["url"])
+    pages = []
+
+    def emit(folder, own=None, **kw):
+        pages.append((folder, page_html(site, template, has_feed=has_feed, canonical_path=f"{folder + '/' if folder else ''}index.html", **kw), own))
+    emit("", title=site["title"], description=site["description"], root="", current="index.html", main=home_main(site, posts, root, engine))
+    for slug, _, heading, items in section_lists(site, posts):
+        emit(slug, title=heading, description=site["description"], root="../", current=slug, main=section_main(heading, items))
+    if site["author_pages"]:
+        emit("authors", title="Authors", description=site["description"], root="../", current="authors", main=authors_main(site, authors))
+        for slug, (name, items) in authors.items():
+            emit(f"authors/{slug}", title=name, description=f"Posts by {name}", root="../../", current=f"authors/{slug}", main=author_main(site, name, items))
+    for e in entries:
+        own = e["source"].with_suffix("")                          # content/posts/NAME/ : the page's own files (media, scripts, styles)
+        emit(e["slug"], own=own if own.is_dir() else None, title=e["title"], description=e["description"], root="../", current=e["slug"],
+             main=entry_main(site, e, publish, root, engine), og_type="article" if e["kind"] == "post" else "website", image=e["image"],
+             styles=e["styles"], scripts=e["scripts"])
+    return pages
+
+
+ASSET_LINK = re.compile(r'((?:href|src)=")((?:\.\./)*)theme/([\w.-]+\.(?:css|js))(")')
+
+
+def stamp_assets(out):
+    """Add ?v=<hash of the file> to the theme's stylesheet and scripts in every page. A host that caches files for minutes (GitHub Pages
+    does) then never pairs a new page with an old stylesheet."""
+    out, versions = Path(out), {}
+
+    def version(name):
+        if name not in versions:
+            f = out / "theme" / name
+            versions[name] = hashlib.sha1(f.read_bytes()).hexdigest()[:8] if f.exists() else ""
+        return versions[name]
+    for page in out.rglob("*.html"):
+        text = page.read_text(encoding="utf-8")
+        stamped = ASSET_LINK.sub(lambda m: f"{m[1]}{m[2]}theme/{m[3]}?v={version(m[3])}{m[4]}" if version(m[3]) else m[0], text)
+        if stamped != text:
+            page.write_text(stamped, encoding="utf-8")
+
+
 def build(root=ROOT, out=None, publish=False, engine=None):
     """Build the site in `root`; returns the list of files written (relative to the output folder). The theme, layout and
     built-in components come from `engine` (this tool's folder); any file under root/theme replaces the engine's file of the same name."""
@@ -829,70 +954,36 @@ def build(root=ROOT, out=None, publish=False, engine=None):
     out = Path(out) if out else root / "public"
     layout = root / "theme" / "layout.html"
     site = load_site(root)
-    template = (layout if layout.exists() else engine / "theme" / "layout.html").read_text(encoding="utf-8")
+    template = read_text(layout if layout.exists() else engine / "theme" / "layout.html")
     loaded = load_entries(root)
+    check_addresses(site, loaded)
     entries = [e for e in loaded if not (publish and e["draft"])]
-    known = {s["id"] for s in site["sections"]}
-    for e in loaded:
-        if e["section"] and e["section"] not in known:
-            raise BuildError(f"{e['source']}: section '{e['section']}' is not listed under \"sections\" in site.json (known: {sorted(known) or 'none'})")
-    for e in loaded:
-        if site["author_pages"] and e["slug"] == "authors":
-            raise BuildError(f"{e['source']}: the address 'authors' is used by the author pages (site.json \"author_pages\"); give the file another name or a slug")
-        if e["slug"] in section_slugs(site):
-            raise BuildError(f"{e['source']}: the address '{e['slug']}' is a section page (see site.json); give the file another name or a slug")
     posts = sorted((e for e in entries if e["kind"] == "post"), key=lambda e: (e["date"], e["slug"]), reverse=True)
-    if site["author_pages"] and "authors" in section_slugs(site):
-        raise BuildError("site.json: a section cannot use the address 'authors' while \"author_pages\" is on")
     authors = author_index(site, posts) if site["author_pages"] else {}
-    check_output_location(root, out)
+    pages = render_pages(site, template, entries, posts, authors, publish, root, engine)
+    check_output_location(root, out, engine)
     prepare_output(out)
-    has_feed = bool(site["url"])
-    skip = shutil.ignore_patterns("layout.html", "components")
+    skip = tree_ignore("layout.html", "components")
     shutil.copytree(engine / "theme", out / "theme", ignore=skip)
     if (root / "theme").is_dir() and (root / "theme").resolve() != (engine / "theme").resolve():
         shutil.copytree(root / "theme", out / "theme", ignore=skip, dirs_exist_ok=True)         # the site's own files win
     if (root / "content" / "images").exists():
-        shutil.copytree(root / "content" / "images", out / "images")
+        shutil.copytree(root / "content" / "images", out / "images", ignore=tree_ignore())
     if not (out / "images" / "favicon.svg").exists():                  # the layout links it on every page
         (out / "images").mkdir(exist_ok=True)
         shutil.copy(engine / "content" / "images" / "favicon.svg", out / "images" / "favicon.svg")
-    (out / "index.html").write_text(page_html(
-        site, template, title=site["title"], description=site["description"], root="", current="index.html",
-        main=home_main(site, posts, publish, root, engine), canonical_path="index.html", has_feed=has_feed), encoding="utf-8")
-    for slug, _, heading, items in section_lists(site, posts):
-        (out / slug).mkdir()
-        (out / slug / "index.html").write_text(page_html(
-            site, template, title=heading, description=site["description"], root="../", current=slug, main=section_main(heading, items),
-            canonical_path=f"{slug}/index.html", has_feed=has_feed), encoding="utf-8")
-    if site["author_pages"]:
-        (out / "authors").mkdir()
-        (out / "authors" / "index.html").write_text(page_html(
-            site, template, title="Authors", description=site["description"], root="../", current="authors", main=authors_main(site, authors),
-            canonical_path="authors/index.html", has_feed=has_feed), encoding="utf-8")
-        for slug, (name, items) in authors.items():
-            (out / "authors" / slug).mkdir()
-            (out / "authors" / slug / "index.html").write_text(page_html(
-                site, template, title=name, description=f"Posts by {name}", root="../../", current=f"authors/{slug}",
-                main=author_main(site, name, items), canonical_path=f"authors/{slug}/index.html",
-                has_feed=has_feed), encoding="utf-8")
-    for e in entries:
-        folder, own = out / e["slug"], e["source"].with_suffix("")
-        if own.is_dir():                                           # content/posts/NAME/ : the page's own files (media, scripts, styles)
-            if (own / "index.html").exists():
-                raise BuildError(f"{own}: a page folder may not contain index.html (the page itself is {e['source'].name})")
-            shutil.copytree(own, folder)
+    for folder, text, own in pages:
+        target = out / folder
+        if own:
+            shutil.copytree(own, target, ignore=tree_ignore())
         else:
-            folder.mkdir()
-        (folder / "index.html").write_text(page_html(
-            site, template, title=e["title"], description=e["description"], root="../", current=e["slug"],
-            main=entry_main(site, e, publish, root, engine), og_type="article" if e["kind"] == "post" else "website", image=e["image"],
-            canonical_path=f'{e["slug"]}/index.html', has_feed=has_feed,
-            styles=e["styles"], scripts=e["scripts"]), encoding="utf-8")
-    if has_feed:                                                    # drafts never go into the feed or the sitemap
+            target.mkdir(parents=True, exist_ok=True)
+        (target / "index.html").write_text(text, encoding="utf-8")
+    stamp_assets(out)
+    if site["url"]:                                                    # drafts never go into the feed or the sitemap
+        listed = ["authors/index.html"] + [f"authors/{s}/index.html" for s in authors] if site["author_pages"] else []
         (out / "feed.xml").write_text(atom_feed(site, [p for p in posts if not p["draft"]]), encoding="utf-8")
-        (out / "sitemap.xml").write_text(sitemap(site, [e for e in entries if not e["draft"]],
-                                                         ["authors/index.html"] + [f"authors/{s}/index.html" for s in authors] if site["author_pages"] else ()), encoding="utf-8")
+        (out / "sitemap.xml").write_text(sitemap(site, [e for e in entries if not e["draft"]], listed), encoding="utf-8")
     else:
         print("note: site.json has no 'url', so feed.xml and sitemap.xml were not written (they need absolute addresses)")
     return sorted(str(p.relative_to(out)).replace("\\", "/") for p in out.rglob("*") if p.is_file())
@@ -937,7 +1028,7 @@ def exists_exactly(out, target, listed):
 
 def check_links(out):
     """Problems in the built site: a link, image, script, stylesheet, font or #anchor that points at nothing."""
-    out, problems, parsed, listed = Path(out), [], {}, {}
+    out, problems, parsed, listed, resolved = Path(out), [], {}, {}, {}
 
     def collect(path):
         if path not in parsed:
@@ -945,27 +1036,35 @@ def check_links(out):
             c.feed(path.read_text(encoding="utf-8"))
             parsed[path] = c
         return parsed[path]
+
+    def resolve(target, as_folder):
+        """(the file an address means, whether it exists exactly). Every page links the same theme files, so each is looked up once.
+        The key is a str: Path keys compare case-insensitively on Windows and would hide a wrong-case link."""
+        key = (str(target), as_folder)
+        if key not in resolved:
+            real = target / "index.html" if as_folder or target.is_dir() else target
+            resolved[key] = (real, exists_exactly(out, real, listed))
+        return resolved[key]
     for page in sorted(out.rglob("*.html")):
+        rel, here = page.relative_to(out), Path(os.path.normpath(page.parent))
         for tag, ref in collect(page).refs:
-            if re.match(r"([a-z][a-z0-9+.-]*:|//)", ref, re.I):
+            if EXTERNAL.match(ref):
                 continue                                                       # external, mailto:, data: ...
             path_part, _, frag = ref.partition("#")
             path_part, frag = unquote(path_part), unquote(frag)
             if path_part.startswith("/"):
-                target = out / path_part.split("?")[0].lstrip("/")                    # a root-relative address starts at the site root
+                target = Path(os.path.normpath(out / path_part.split("?")[0].lstrip("/")))      # a root-relative address starts at the site root
             else:
-                target = page if not path_part else (page.parent / path_part.split("?")[0])
-            if target.is_dir() or path_part.endswith("/"):
-                target = target / "index.html"
-            rel = page.relative_to(out)
-            if not exists_exactly(out, target, listed):
+                target = Path(os.path.normpath(page if not path_part else here / path_part.split("?")[0]))
+            target, found = resolve(target, path_part.endswith("/"))
+            if not found:
                 problems.append(f"{rel}: <{tag}> points at {ref!r}, which does not exist")
             elif frag and target.suffix == ".html" and frag not in collect(target).ids:
                 problems.append(f"{rel}: {ref!r} has no element with id {frag!r}")
     for css in out.rglob("*.css"):
         for ref in re.findall(r"url\(([^)]+)\)", css.read_text(encoding="utf-8")):
-            ref = ref.strip("\"'")
-            if not re.match(r"(data:|https?:)", ref) and not (css.parent / ref).exists():
+            ref = ref.strip("\"'").split("?")[0].split("#")[0]
+            if ref and not EXTERNAL.match(ref) and not ref.startswith("/") and not (css.parent / ref).exists():      # not a data:, //host, /root or #id reference
                 problems.append(f"{css.relative_to(out)}: url({ref}) does not exist")
     return problems
 
@@ -979,8 +1078,8 @@ def main(argv=None):
     a = ap.parse_args(argv)
     try:
         site_dir = Path(a.site).resolve() if a.site else ROOT
-        files = build(site_dir, a.out, a.publish)
         out = Path(a.out) if a.out else site_dir / "public"
+        files = build(site_dir, out, a.publish)
         print(f"built {len(files)} files into {out}" + (" (publish mode)" if a.publish else ""))
         if a.check:
             problems = check_links(out)
@@ -989,7 +1088,7 @@ def main(argv=None):
             if problems:
                 return 1
             print("all links and file references resolve")
-    except (BuildError, OSError) as e:
+    except (BuildError, OSError, ValueError) as e:
         print(f"error: {e}", file=sys.stderr)
         return 2
     return 0

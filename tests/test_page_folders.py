@@ -52,9 +52,9 @@ def test_styles_and_scripts_are_linked_in_order_after_the_theme(tmp_path):
     with_folder(tmp_path, {"assets/clip.mp4": "v", "one.css": "p{}", "two.css": "p{}", "a.js": "1", "b.js": "2"}, styles="one.css, two.css", scripts="a.js?v=3, b.js")
     B.build(tmp_path, tmp_path / "out")
     page = (tmp_path / "out" / "trail" / "index.html").read_text(encoding="utf-8")
-    css = [m for m in re.findall(r'<link rel="stylesheet" href="([^"]+)"', page)]
+    css = [re.sub(r"\?v=[0-9a-f]{8}", "", m) for m in re.findall(r'<link rel="stylesheet" href="([^"]+)"', page)]       # theme files carry a version stamp
     assert css == ["../theme/style.css", "one.css", "two.css"]                       # the page's own styles win over the theme
-    js = re.findall(r'<script src="([^"]+)"', page)
+    js = [re.sub(r"\?v=[0-9a-f]{8}", "", m) for m in re.findall(r'<script src="([^"]+)"', page)]
     assert js == ["a.js?v=3", "b.js", "../theme/theme.js"]
     assert B.check_links(tmp_path / "out") == []
     home = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")

@@ -13,7 +13,7 @@ CSS = (ROOT / "theme" / "style.css").read_text(encoding="utf-8")
 def dark_tokens():
     block = re.search(r"@media\s+screen\s+and\s+\(prefers-color-scheme:\s*dark\)\s*\{\s*:root\[data-scheme=[\"']auto[\"']\]\s*\{(.*?)\}\s*\}", CSS, re.S)
     assert block, "the dark palette must sit in @media screen and (prefers-color-scheme:dark){:root[data-scheme=auto]{...}}"
-    return dict(re.findall(r"--([\w-]+)\s*:\s*(#[0-9A-Fa-f]{6})", block.group(1)))
+    return dict(re.findall(r"--([\w-]+)\s*:\s*(#[0-9A-Fa-f]{3,8})\b", block.group(1)))
 
 
 def light_tokens():
@@ -142,9 +142,11 @@ def test_an_unknown_or_badly_declared_section_is_a_message(tmp_path):
     site = make_site(tmp_path / "a", posts={"x.html": post(section="nope")}, sections=SECTIONS)
     with pytest.raises(B.BuildError, match="section 'nope' is not listed"):
         B.build(site, site / "public")
-    for bad in ([{"id": "posts", "heading": "X"}], [{"id": "A b", "heading": "X"}], [{"id": "a"}], SECTIONS + SECTIONS):
-        with pytest.raises(B.BuildError, match="section"):
-            B.load_site(make_site(tmp_path / f"b{len(str(bad))}", sections=bad))
+    cases = [([{"id": "posts", "heading": "X"}], "must look like"), ([{"id": "A b", "heading": "X"}], "must look like"), ([{"id": "a"}], "must look like"),
+             (SECTIONS + SECTIONS, "must be unique")]
+    for n, (bad, message) in enumerate(cases):
+        with pytest.raises(B.BuildError, match=message):
+            B.load_site(make_site(tmp_path / f"b{n}", sections=bad))
 
 
 def test_every_nav_rule_is_scoped_to_the_site_header_so_the_contents_box_is_not_reshaped():
@@ -298,7 +300,7 @@ def test_author_pages_have_no_authors_row_on_static_pages_and_none_when_there_ar
 @pytest.mark.parametrize("posts,match", [
     ({"a.html": post(authors="Jo Smith"), "b.html": post(authors="jo  smith")}, "would both live at authors/jo-smith"),
     ({"a.html": post(authors="Zoë"), "b.html": post(authors="Zoe")}, "would both live at authors/zoe"),
-    ({"a.html": post(authors="张伟")}, "has no letters or digits"),
+    ({"a.html": post(authors="张伟")}, "has no usable address"),
     ({"authors.html": post()}, "'authors' is used by the author pages"),
 ])
 def test_author_address_problems_are_messages(tmp_path, posts, match):
@@ -328,9 +330,10 @@ def test_note_text_in_figures_stays_dark_on_butter():
 
 
 def test_every_rule_with_a_butter_background_also_sets_the_dark_text_colour():
-    for body in re.findall(r"\{([^{}]*)\}", CSS):
-        if re.search(r"background\s*:\s*var\(--butter\)", body):
-            assert re.search(r"color\s*:\s*var\(--on-butter\)", body), body
+    rules = [body for body in re.findall(r"\{([^{}]*)\}", CSS) if re.search(r"background\s*:\s*var\(--butter\)", body)]
+    assert len(rules) >= 5, "the butter highlight is used by mark, pills, buttons, callouts and footnotes"      # not vacuous if the loop finds nothing
+    for body in rules:
+        assert re.search(r"color\s*:\s*var\(--on-butter\)", body), body
 
 
 def test_links_code_and_focus_rings_inside_the_butter_highlight_use_the_dark_text_colour():
@@ -342,7 +345,7 @@ def test_links_code_and_focus_rings_inside_the_butter_highlight_use_the_dark_tex
 def test_no_colour_keywords_outside_the_tokens():
     body = re.sub(r"/\*.*?\*/", "", CSS.split(".skip{", 1)[1], flags=re.S)
     body = re.sub(r"@media print\{.*", "", body)
-    assert not re.search(r"\b(?:black|white)\b", body, re.I)
+    assert not re.search(r"(?<![-\w])(?:black|white)(?![-\w])", body, re.I)                  # (white-space is not a colour)
 
 
 def test_only_links_lift_on_hover_not_every_chip_and_wide_grids_cannot_force_overflow():
@@ -387,7 +390,7 @@ def test_a_section_page_has_its_own_title_canonical_feed_link_stylesheet_and_an_
     page = (out / "q" / "index.html").read_text(encoding="utf-8")
     assert "<h1>A &amp; B</h1>" in page and "<title>A &amp; B | Test Blog</title>" in page
     assert '<link rel="canonical" href="https://blog.example/q/index.html">' in page
-    assert 'rel="alternate" type="application/atom+xml"' in page and 'href="../theme/style.css"' in page
+    assert 'rel="alternate" type="application/atom+xml"' in page and 'href="../theme/style.css?v=' in page
 
 
 def test_a_draft_section_entry_is_hidden_on_its_section_page_when_publishing_and_badged_otherwise(tmp_path):

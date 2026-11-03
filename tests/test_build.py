@@ -65,7 +65,7 @@ def test_the_shipped_site_has_no_url_so_no_feed_is_written_and_none_is_linked(sa
 
 def test_the_page_skeleton_is_accessible(sample):
     page = (sample / "components" / "index.html").read_text(encoding="utf-8")
-    assert '<html lang="en">' in page and 'class="skip" href="#content"' in page and '<main id="content">' in page
+    assert '<html lang="en">' in page and 'class="skip" href="#content"' in page and '<main>' in page and '<span id="content" tabindex="-1"></span>' in page
     assert re.search(r"<title>Every component in one place \| Your Name</title>", page)
     assert page.count("<h1>") == 1 and 'aria-label="Main"' in page
     for svg in re.findall(r"<svg\b[^>]*>", page):
@@ -230,7 +230,7 @@ def test_relative_paths_are_right_at_every_depth_so_the_site_works_from_a_folder
     B.build(tmp_path, tmp_path / "out")
     home = (tmp_path / "out" / "index.html").read_text(encoding="utf-8")
     deep = (tmp_path / "out" / "a" / "index.html").read_text(encoding="utf-8")
-    assert 'href="theme/style.css"' in home and 'href="../theme/style.css"' in deep
+    assert 'href="theme/style.css?v=' in home and 'href="../theme/style.css?v=' in deep
     assert 'href="a/index.html"' in home and 'href="../about/index.html"' in deep and 'href="../index.html"' in deep
     assert B.check_links(tmp_path / "out") == []
 
