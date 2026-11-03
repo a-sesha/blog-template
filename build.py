@@ -137,6 +137,7 @@ def load_site(root=ROOT):
     site.setdefault("description", "")
     site.setdefault("intro", "")
     site.setdefault("footer", "")
+    site.setdefault("posts_heading", "Posts")
     site.setdefault("nav", [])
     site["url"] = site.get("url", "").rstrip("/")
     return site
@@ -487,7 +488,7 @@ def home_main(site, posts, publish, root_dir=ROOT, engine=None):
         items.append(f'<li class="entry"><time datetime="{p["date"].isoformat()}">{fmt_date(p["date"])}</time><div>'
                      f'<a class="title" href="{p["slug"]}/index.html">{esc(p["title"])}</a>{badge}{desc}</div></li>')
     listing = '<ul class="entries">' + "".join(items) + "</ul>" if items else "<p>Nothing published yet.</p>"
-    return f'<h1>{esc(site["title"])}</h1>\n<div class="lede">{expand_shortcodes(site["intro"], Ctx(root_dir, "", "site.json (intro)", engine))}</div>\n<h2 id="posts">Posts</h2>\n{listing}'
+    return f'<h1>{esc(site["title"])}</h1>\n<div class="lede">{expand_shortcodes(site["intro"], Ctx(root_dir, "", "site.json (intro)", engine))}</div>\n<h2 id="posts">{esc(site["posts_heading"])}</h2>\n{listing}'
 
 
 def atom_feed(site, posts):

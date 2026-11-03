@@ -104,3 +104,8 @@ def test_footer_default_custom_and_off(tmp_path):
     assert "<p>Mine</p></footer>" in build_home(tmp_path / "c", footer="<p>Mine</p>")
     off = build_home(tmp_path / "d", footer=False)
     assert "<footer" not in off and "&copy;" not in off
+
+
+def test_the_home_heading_over_the_post_list_is_configurable_and_escaped(tmp_path):
+    assert '<h2 id="posts">Posts</h2>' in build_home(tmp_path / "a")
+    assert '<h2 id="posts">Musings &amp; notes</h2>' in build_home(tmp_path / "b", posts_heading="Musings & notes")
