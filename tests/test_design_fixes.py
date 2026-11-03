@@ -113,8 +113,8 @@ def test_footer_default_custom_and_off(tmp_path):
 
 
 def test_the_home_heading_over_the_post_list_is_configurable_and_escaped(tmp_path):
-    assert '<h2 id="posts">Posts</h2>' in build_home(tmp_path / "a")
-    assert '<h2 id="posts">Musings &amp; notes</h2>' in build_home(tmp_path / "b", posts_heading="Musings & notes")
+    assert '<h2 id="posts"><a class="section-link" href="posts/index.html">Posts</a></h2>' in build_home(tmp_path / "a")
+    assert 'href="posts/index.html">Musings &amp; notes</a></h2>' in build_home(tmp_path / "b", posts_heading="Musings & notes")
 
 
 # ---- extra home-page sections ---------------------------------------------------------------------------------------------------------
@@ -127,8 +127,8 @@ def test_the_home_page_lists_each_section_under_its_own_heading(tmp_path):
     B.build(site, site / "public")
     home = (site / "public" / "index.html").read_text(encoding="utf-8")
     musings, crosswords = home.split('<h2 id="crosswords">')
-    assert '<h2 id="posts">Musings</h2>' in musings and "A musing" in musings and "A grid" not in musings
-    assert "Crosswords</h2>" in crosswords and "A grid" in crosswords and "A musing" not in crosswords
+    assert 'href="posts/index.html">Musings</a></h2>' in musings and "A musing" in musings and "A grid" not in musings
+    assert "Crosswords</a></h2>" in crosswords and "A grid" in crosswords and "A musing" not in crosswords
 
 
 def test_an_empty_section_says_so_and_a_draft_section_entry_is_left_out_when_publishing(tmp_path):
@@ -474,7 +474,7 @@ def sectioned_authors(tmp, **over):
 
 def test_an_author_page_groups_entries_under_a_heading_per_section(tmp_path):
     page = (sectioned_authors(tmp_path) / "authors" / "a-writer" / "index.html").read_text(encoding="utf-8")
-    assert page.index('<h2 id="posts">Musings</h2>') < page.index("Musing One") < page.index("Musing Two") < page.index('<h2 id="crosswords">Crosswords</h2>') < page.index("Grid One")
+    assert page.index('<h2 id="posts"><a class="section-link" href="../../posts/index.html">Musings</a></h2>') < page.index("Musing One") < page.index("Musing Two") < page.index('<h2 id="crosswords"><a class="section-link" href="../../crosswords/index.html">Crosswords</a></h2>') < page.index("Grid One")
     assert "Grid Two" not in page and 'href="../../x1/index.html"' in page
 
 
@@ -482,9 +482,9 @@ def test_a_group_with_no_entries_for_that_author_is_left_out(tmp_path):
     out = build_out(make_site(tmp_path, posts={"m.html": post(title="Only Musing"), "x.html": post(title="Grid", section="crosswords", authors="Other Setter")},
                               author_pages=True, posts_heading="Musings", sections=SECTIONS, pages={"about.html": ABOUT}))
     page = (out / "authors" / "a-writer" / "index.html").read_text(encoding="utf-8")
-    assert "Musings</h2>" in page and "Crosswords</h2>" not in page
+    assert "Musings</a></h2>" in page and "Crosswords</a></h2>" not in page
     other = (out / "authors" / "other-setter" / "index.html").read_text(encoding="utf-8")
-    assert "Crosswords</h2>" in other and "Musings</h2>" not in other
+    assert "Crosswords</a></h2>" in other and "Musings</a></h2>" not in other
 
 
 def test_the_authors_index_shows_a_breakdown_by_section_and_stays_plain_without_sections(tmp_path):
@@ -502,3 +502,26 @@ def test_section_headings_on_author_pages_are_escaped_and_follow_site_json_order
     page = (out / "authors" / "a-writer" / "index.html").read_text(encoding="utf-8")
     assert page.index("Z &amp; Co") < page.index(">Alpha<") and "Z & Co" not in page
     assert B.check_links(out) == []
+
+
+# ---- section headings are links -------------------------------------------------------------------------------------------------------------------
+def test_home_headings_link_to_their_section_pages_and_the_links_resolve(tmp_path):
+    site = make_site(tmp_path, posts={"m.html": post(), "x.html": post(title="G", section="crosswords")}, sections=SECTIONS, posts_heading="Musings", posts_slug="musings",
+                     pages={"about.html": ABOUT})
+    out = build_out(site)
+    home = (out / "index.html").read_text(encoding="utf-8")
+    assert '<h2 id="posts"><a class="section-link" href="musings/index.html">Musings</a></h2>' in home
+    assert '<h2 id="crosswords"><a class="section-link" href="crosswords/index.html">Crosswords</a></h2>' in home
+    assert B.check_links(out) == []
+
+
+def test_author_page_headings_link_to_the_section_pages_two_levels_up(tmp_path):
+    out = sectioned_authors(tmp_path)
+    page = (out / "authors" / "a-writer" / "index.html").read_text(encoding="utf-8")
+    assert 'href="../../posts/index.html">Musings</a>' in page and 'href="../../crosswords/index.html">Crosswords</a>' in page
+    assert B.check_links(out) == []
+
+
+def test_section_heading_links_show_an_arrow_on_hover_not_the_self_link_hash():
+    assert re.search(r"h2:hover a\.section-link::after\s*\{\s*content:\s*\" \\2192\"", CSS)
+    assert re.search(r"h2 a\.section-link\s*\{[^}]*text-decoration:\s*underline", CSS)

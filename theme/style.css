@@ -66,6 +66,9 @@ h1{font-family:var(--serif);font-weight:400;font-size:60px;line-height:1.02;marg
 h2{font-family:var(--serif);font-weight:400;font-size:30px;line-height:1.15;margin:64px 0 14px}
 h3{font-family:var(--serif);font-weight:500;font-size:22px;line-height:1.2;margin:36px 0 8px}
 h2 a,h3 a{color:inherit;text-decoration:none}
+h2 a.section-link{text-decoration:underline;text-decoration-color:var(--muted-2);text-decoration-thickness:1px;text-underline-offset:7px}      /* a heading that leads to its own page */
+h2 a.section-link:hover{text-decoration-color:var(--ink)}
+h2:hover a.section-link::after{content:" \2192";color:var(--muted-2);font-family:var(--mono);font-size:.55em}
 h2:hover a::after,h3:hover a::after{content:" #";color:var(--muted-2);font-family:var(--mono);font-size:.55em}
 p{margin:0 0 14px}
 .lede{font-size:20px;line-height:1.55;color:var(--ink)}

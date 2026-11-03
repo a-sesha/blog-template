@@ -712,17 +712,23 @@ def author_index(site, posts):
     return found
 
 
+def section_link(slug, heading, root):
+    """A section's heading as a link to that section's own page; `root` gets from the current page to the site root."""
+    return f'<a class="section-link" href="{root}{slug}/index.html">{esc(heading)}</a>'
+
+
 def author_groups(site, items):
-    """An author's entries split by section, in site.json order, empty groups left out: [(anchor, heading, entries)].
+    """An author's entries split by section, in site.json order, empty groups left out: [(address, anchor, heading, entries)].
     A site with no extra sections has one list, so there is nothing to tell apart and the caller shows it plain."""
-    return [(anchor, heading, entries) for _, anchor, heading, entries in section_lists(site, items) if entries]
+    return [group for group in section_lists(site, items) if group[3]]
 
 
 def author_main(site, name, items):
     """One author's page: their entries under a heading per section (Musings, Crosswords, ...) when the site has sections."""
     if not site["sections"]:
         return f"<h1>{esc(name)}</h1>\n{entry_list(items, '../../')}"
-    groups = "\n".join(f'<h2 id="{anchor}">{esc(heading)}</h2>\n{entry_list(entries, "../../")}' for anchor, heading, entries in author_groups(site, items))
+    groups = "\n".join(f'<h2 id="{anchor}">{section_link(slug, heading, "../../")}</h2>\n{entry_list(entries, "../../")}'
+                       for slug, anchor, heading, entries in author_groups(site, items))
     return f"<h1>{esc(name)}</h1>\n{groups}"
 
 
@@ -732,7 +738,7 @@ def authors_main(site, authors):
     for slug, (name, items) in sorted(authors.items(), key=lambda kv: kv[1][0].casefold()):
         detail = ""
         if site["sections"]:
-            detail = "<p>" + " · ".join(f"{esc(heading)} {len(entries)}" for _, heading, entries in author_groups(site, items)) + "</p>"
+            detail = "<p>" + " · ".join(f"{esc(heading)} {len(entries)}" for _, _, heading, entries in author_groups(site, items)) + "</p>"
         rows.append(f'<li class="entry"><span class="count">{len(items)} post{"" if len(items) == 1 else "s"}</span><div>'
                     f'<a class="title" href="{slug}/index.html">{esc(name)}</a>{detail}</div></li>')
     return "<h1>Authors</h1>\n" + ('<ul class="entries">' + "".join(rows) + "</ul>" if rows else "<p>Nothing published yet.</p>")
@@ -758,7 +764,7 @@ def section_lists(site, posts):
 def home_main(site, posts, publish, root_dir=ROOT, engine=None):
     """The overview: the intro, then every list (the main one under `posts_heading`, then one per extra section)."""
     intro = expand_shortcodes(site["intro"], Ctx(root_dir, "", "site.json (intro)", engine))
-    parts = "\n".join(f'<h2 id="{anchor}">{esc(heading)}</h2>\n{entry_list(items)}' for _, anchor, heading, items in section_lists(site, posts))
+    parts = "\n".join(f'<h2 id="{anchor}">{section_link(slug, heading, "")}</h2>\n{entry_list(items)}' for slug, anchor, heading, items in section_lists(site, posts))
     return f'<h1>{esc(site["title"])}</h1>\n<div class="lede">{intro}</div>\n{parts}'
 
 
