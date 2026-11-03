@@ -461,3 +461,44 @@ def test_the_default_footer_names_the_author_and_the_year_and_an_empty_footer_is
         over = {} if footer is None else {"footer": footer}
         home = build_home(tmp_path / f"f{i}", **over)
         assert f"&copy; {datetime.date.today().year} A. Writer</p></footer>" in home
+
+
+# ---- author pages tell sections apart ------------------------------------------------------------------------------------------------------------
+def sectioned_authors(tmp, **over):
+    posts = {"m1.html": post(title="Musing One", date="2026-03-01", authors="A. Writer, B. Coauthor"),
+             "m2.html": post(title="Musing Two", date="2026-01-01", authors="A. Writer"),
+             "x1.html": post(title="Grid One", date="2026-02-01", section="crosswords", authors="A. Writer"),
+             "x2.html": post(title="Grid Two", date="2026-04-01", section="crosswords", authors="B. Coauthor")}
+    return build_out(make_site(tmp, posts=posts, author_pages=True, posts_heading="Musings", sections=SECTIONS, pages={"about.html": ABOUT}, **over))
+
+
+def test_an_author_page_groups_entries_under_a_heading_per_section(tmp_path):
+    page = (sectioned_authors(tmp_path) / "authors" / "a-writer" / "index.html").read_text(encoding="utf-8")
+    assert page.index('<h2 id="posts">Musings</h2>') < page.index("Musing One") < page.index("Musing Two") < page.index('<h2 id="crosswords">Crosswords</h2>') < page.index("Grid One")
+    assert "Grid Two" not in page and 'href="../../x1/index.html"' in page
+
+
+def test_a_group_with_no_entries_for_that_author_is_left_out(tmp_path):
+    out = build_out(make_site(tmp_path, posts={"m.html": post(title="Only Musing"), "x.html": post(title="Grid", section="crosswords", authors="Other Setter")},
+                              author_pages=True, posts_heading="Musings", sections=SECTIONS, pages={"about.html": ABOUT}))
+    page = (out / "authors" / "a-writer" / "index.html").read_text(encoding="utf-8")
+    assert "Musings</h2>" in page and "Crosswords</h2>" not in page
+    other = (out / "authors" / "other-setter" / "index.html").read_text(encoding="utf-8")
+    assert "Crosswords</h2>" in other and "Musings</h2>" not in other
+
+
+def test_the_authors_index_shows_a_breakdown_by_section_and_stays_plain_without_sections(tmp_path):
+    index = (sectioned_authors(tmp_path / "s") / "authors" / "index.html").read_text(encoding="utf-8")
+    assert "<p>Musings 2 · Crosswords 1</p>" in index and "<p>Musings 1 · Crosswords 1</p>" in index and "3 posts" in index
+    plain = build_out(make_site(tmp_path / "p", posts={"a.html": post()}, author_pages=True, pages={"about.html": ABOUT}))
+    assert "<h2" not in (plain / "authors" / "a-writer" / "index.html").read_text(encoding="utf-8").split("<main")[1]
+    assert "·" not in (plain / "authors" / "index.html").read_text(encoding="utf-8")
+
+
+def test_section_headings_on_author_pages_are_escaped_and_follow_site_json_order(tmp_path):
+    secs = [{"id": "zeta", "heading": "Z & Co"}, {"id": "alpha", "heading": "Alpha"}]
+    out = build_out(make_site(tmp_path, posts={"a.html": post(section="alpha", title="A1"), "z.html": post(section="zeta", title="Z1")}, author_pages=True,
+                              sections=secs, posts_heading="Notes", pages={"about.html": ABOUT}))
+    page = (out / "authors" / "a-writer" / "index.html").read_text(encoding="utf-8")
+    assert page.index("Z &amp; Co") < page.index(">Alpha<") and "Z & Co" not in page
+    assert B.check_links(out) == []

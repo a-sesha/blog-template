@@ -32,7 +32,8 @@ shows only its entries: `crosswords/index.html` for a section (its `id`), and `p
 (`"posts_slug": "musings"`). Point `nav` at those. An unknown section name, or a section address that a post or page already uses, stops the build.
 
 Author pages are off by default. Set `"author_pages": true` in `site.json` and each name in a post's `authors:` (comma-separated, default `author`)
-becomes a link to `authors/<name>/index.html`, which lists only that author's posts; `authors/index.html` lists everyone with a post count.
+becomes a link to `authors/<name>/index.html`, which lists only that author's posts (under a heading per section, such as Musings and Crosswords, when the site has sections); `authors/index.html`
+lists everyone with a post count, and with sections a breakdown under each name.
 Use it in `nav`. The address is the name in lower-case letters and digits with dashes (`Zoë Q. Writer` is `zoe-q-writer`); write a name the
 same way everywhere, because two spellings that make one address stop the build, as does a post or section already using `authors`.
 There are no tags: a `tags:` line in old front matter is ignored.

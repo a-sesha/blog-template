@@ -712,11 +712,30 @@ def author_index(site, posts):
     return found
 
 
-def authors_main(authors):
-    rows = "".join(f'<li class="entry"><span class="count">{len(items)} post{"" if len(items) == 1 else "s"}</span><div>'
-                   f'<a class="title" href="{slug}/index.html">{esc(name)}</a></div></li>'
-                   for slug, (name, items) in sorted(authors.items(), key=lambda kv: kv[1][0].casefold()))
-    return "<h1>Authors</h1>\n" + ('<ul class="entries">' + rows + "</ul>" if rows else "<p>Nothing published yet.</p>")
+def author_groups(site, items):
+    """An author's entries split by section, in site.json order, empty groups left out: [(anchor, heading, entries)].
+    A site with no extra sections has one list, so there is nothing to tell apart and the caller shows it plain."""
+    return [(anchor, heading, entries) for _, anchor, heading, entries in section_lists(site, items) if entries]
+
+
+def author_main(site, name, items):
+    """One author's page: their entries under a heading per section (Musings, Crosswords, ...) when the site has sections."""
+    if not site["sections"]:
+        return f"<h1>{esc(name)}</h1>\n{entry_list(items, '../../')}"
+    groups = "\n".join(f'<h2 id="{anchor}">{esc(heading)}</h2>\n{entry_list(entries, "../../")}' for anchor, heading, entries in author_groups(site, items))
+    return f"<h1>{esc(name)}</h1>\n{groups}"
+
+
+def authors_main(site, authors):
+    """The index of authors: a total per author, and with sections a breakdown under the name ("Musings 2 · Crosswords 1")."""
+    rows = []
+    for slug, (name, items) in sorted(authors.items(), key=lambda kv: kv[1][0].casefold()):
+        detail = ""
+        if site["sections"]:
+            detail = "<p>" + " · ".join(f"{esc(heading)} {len(entries)}" for _, heading, entries in author_groups(site, items)) + "</p>"
+        rows.append(f'<li class="entry"><span class="count">{len(items)} post{"" if len(items) == 1 else "s"}</span><div>'
+                    f'<a class="title" href="{slug}/index.html">{esc(name)}</a>{detail}</div></li>')
+    return "<h1>Authors</h1>\n" + ('<ul class="entries">' + "".join(rows) + "</ul>" if rows else "<p>Nothing published yet.</p>")
 
 
 def entry_list(posts, root=""):
@@ -843,13 +862,13 @@ def build(root=ROOT, out=None, publish=False, engine=None):
     if site["author_pages"]:
         (out / "authors").mkdir()
         (out / "authors" / "index.html").write_text(page_html(
-            site, template, title="Authors", description=site["description"], root="../", current="authors", main=authors_main(authors),
+            site, template, title="Authors", description=site["description"], root="../", current="authors", main=authors_main(site, authors),
             canonical_path="authors/index.html", has_feed=has_feed), encoding="utf-8")
         for slug, (name, items) in authors.items():
             (out / "authors" / slug).mkdir()
             (out / "authors" / slug / "index.html").write_text(page_html(
                 site, template, title=name, description=f"Posts by {name}", root="../../", current=f"authors/{slug}",
-                main=f"<h1>{esc(name)}</h1>\n{entry_list(items, '../../')}", canonical_path=f"authors/{slug}/index.html",
+                main=author_main(site, name, items), canonical_path=f"authors/{slug}/index.html",
                 has_feed=has_feed), encoding="utf-8")
     for e in entries:
         folder, own = out / e["slug"], e["source"].with_suffix("")
